@@ -145,3 +145,27 @@ export interface ReferenceStatus {
   chunks: number
   error: string | null
 }
+
+/** A retrieved passage (what the review agent and the ask endpoint both see). */
+export interface EvidenceHit {
+  chunk_id: string
+  doc_id: string
+  doc_type: DocType
+  source_name: string
+  page: number
+  excerpt: string
+  score: number
+}
+
+/** Grounded answer to one question; citations passed the same guard as review flags. */
+export interface AskResult {
+  engagement_id: string
+  question: string
+  answer: string
+  found_in_documents: boolean
+  citations: Citation[]
+  passages: EvidenceHit[]
+  citation_guard: CitationGuardReport
+  model: string
+  disclaimer: string
+}

@@ -17,6 +17,7 @@ from fastapi import (
 from pydantic import BaseModel, Field
 
 from app.api.dependencies import (
+    get_ask_service,
     get_engagement_service,
     get_processing_service,
     get_review_service,
@@ -24,6 +25,7 @@ from app.api.dependencies import (
 from app.db.engagements import DocumentRecord
 from app.models.engagement import ENGAGEMENT_ID_PATTERN
 from app.models.evidence import DocType
+from app.services.ask_service import AskError, AskResult, AskService
 from app.services.engagement_data import EngagementNotFoundError
 from app.services.engagement_service import (
     EngagementDetail,
@@ -39,6 +41,11 @@ EngagementId = Annotated[str, Path(pattern=ENGAGEMENT_ID_PATTERN)]
 Engagements = Annotated[EngagementService, Depends(get_engagement_service)]
 Processing = Annotated[ProcessingService, Depends(get_processing_service)]
 Reviews = Annotated[ReviewService, Depends(get_review_service)]
+Ask = Annotated[AskService, Depends(get_ask_service)]
+
+
+class AskRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=2000)
 
 
 class CreateEngagementRequest(BaseModel):
@@ -176,3 +183,22 @@ def reference_status(processing: Processing) -> ReferenceStatus:
 def index_reference(background: BackgroundTasks, processing: Processing) -> dict[str, str]:
     background.add_task(processing.index_reference)
     return {"status": "processing"}
+
+
+@router.post("/engagements/{engagement_id}/ask", response_model=AskResult)
+def ask_engagement(
+    engagement_id: EngagementId, body: AskRequest, engagements: Engagements, ask: Ask
+) -> AskResult:
+    """Grounded answer from the engagement's indexed documents, with verified citations."""
+    if not body.question.strip():
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "question is empty")
+    try:
+        if not engagements.detail(engagement_id).can_ask:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT, "index at least one document before asking questions"
+            )
+        return ask.ask(engagement_id, body.question)
+    except EngagementNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"unknown engagement {exc}") from exc
+    except AskError as exc:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"answer error: {exc}") from exc

@@ -467,3 +467,51 @@ textarea {
     grid-template-columns: 1fr;
   }
 }
+
+/* --- ask step --- */
+.answer__question {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.answer__text {
+  font-size: 1.02rem;
+  white-space: pre-wrap;
+}
+
+.answer__citations {
+  background: #eff6ff;
+}
+
+.answer__citations h5 {
+  margin: 0 0 0.25rem;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.answer__passages {
+  margin-top: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.answer__passages summary {
+  cursor: pointer;
+  color: #1d4ed8;
+}
+
+.passages {
+  margin: 0.5rem 0 0;
+  padding-left: 1.1rem;
+}
+
+.passage {
+  white-space: pre-wrap;
+  font-size: 0.8rem;
+  background: #f9fafb;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.5rem;
+  margin: 0.25rem 0 0.75rem;
+}

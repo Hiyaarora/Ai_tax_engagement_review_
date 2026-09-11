@@ -173,7 +173,11 @@ Evidence & findings**. Plain React + CSS, hash routing (`#/e/<engagement_id>/<st
   embeddings → AI Search in a FastAPI `BackgroundTask`; each file shows
   `uploaded → processing → indexed | failed` (with the error) and the page polls until done.
   **Load synthetic demo** pushes the Acme fixtures through the *same* upload/processing path.
-- **2 · Ask agent** — placeholder for the grounded Q&A step (next section); enabled by `can_ask`.
+- **2 · Ask agent** — grounded question answering (`POST /api/engagements/{id}/ask`, enabled by
+  `can_ask`): the backend runs the same engagement-scoped hybrid search the review agent uses,
+  asks GPT-4.1-mini to answer *only* from those passages (strict JSON), and passes the citations
+  through the same citation guard. The UI shows the answer, the verified citations, the raw
+  passages the model was given, and flags answers the documents could not support.
 - **3 · Run review** — enabled by the backend's `can_review` (≥1 indexed document); queues the
   agent (`queued → running → done | failed`), lists past reviews with status.
 - **4 · Evidence & findings** — summary, citation-guard notes, one card per flag with **Retrieved
@@ -187,7 +191,7 @@ the deterministic tools tolerate a missing sales/questionnaire/locations file an
 Endpoints: `GET|POST /api/engagements`, `GET /api/engagements/{id}`,
 `POST /api/engagements/{id}/documents` (multipart), `POST …/documents/process` (202),
 `POST …/demo-files` (202), `GET /api/reference`, `POST /api/reference/index` (202),
-`POST /api/engagements/{id}/reviews` (202, 409 if not ready), `GET /api/engagements/{id}/reviews`,
+`POST /api/engagements/{id}/ask` (409 if not ready), `POST /api/engagements/{id}/reviews` (202, 409 if not ready), `GET /api/engagements/{id}/reviews`,
 `GET /api/reviews/{id}` (status + result + decisions), `PATCH /api/reviews/{id}/flags/{flag_id}`.
 
 Run the backend (below), then `cd frontend && npm run dev` and open http://localhost:5173.
@@ -243,7 +247,7 @@ Azure SDK clients are wrapped once in `backend/app/azure/` (`credential.py`, `do
    - Stage 1 ✅ Azure resources provisioned; keyless SDK wrappers; connectivity check (`scripts/check_azure.py`, `/api/health/azure`)
    - Stage 2 ✅ synthetic data generator, page-aware chunking, `fd-evidence` index, ingestion pipeline, `search_evidence` tool
 3. **Agent loop** — deterministic tools, Foundry agent + tool dispatch, `ReviewResult` schema, citation guard, SQLite, review API ✅
-4. **Review UI** — create → upload/process (background) → ask → run review (background) → findings with decisions ✅ (ask step: next)
+4. **Review UI** — create → upload/process (background) → ask (grounded Q&A) → run review (background) → findings with decisions ✅
 5. **Observability** — OpenTelemetry traces into Foundry
 6. **Evaluation** — golden set, groundedness/relevance, flag recall, citation validity
 7. **Polish** — docs, demo script

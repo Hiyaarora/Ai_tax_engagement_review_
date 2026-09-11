@@ -237,3 +237,25 @@ def test_rejected_quote_text_is_kept_in_the_report_for_debugging(acme_data):
     assert [u.model_dump() for u in report.unverified_quotes] == [
         {"chunk_id": "q-p1-c0", "quote": "inventory in Nevada"}
     ]
+
+
+def test_guard_citations_is_reusable_outside_a_review_draft(acme_data):
+    from app.agent.citation_guard import guard_citations
+    from app.models.review import CitationGuardReport
+
+    ctx = _ctx(acme_data, [_hit("q-p1-c0", 1, "Does the company hold inventory in Texas? Yes")], [])
+    report = CitationGuardReport()
+    kept = guard_citations(
+        [
+            Citation(
+                chunk_id="q-p1-c0", source_name="wrong.pdf", page=7, quote="inventory in Texas? Yes"
+            ),
+            Citation(chunk_id="ghost-p1-c0", source_name="g.pdf", page=1, quote="x"),
+        ],
+        ctx,
+        report,
+    )
+    assert [(c.chunk_id, c.source_name, c.page) for c in kept] == [
+        ("q-p1-c0", "questionnaire.pdf", 1)
+    ]
+    assert report.dropped_citations == ["ghost-p1-c0"] and report.corrected_citations == ["q-p1-c0"]

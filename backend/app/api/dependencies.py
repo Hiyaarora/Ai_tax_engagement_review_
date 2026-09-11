@@ -12,12 +12,14 @@ from pathlib import Path
 
 from app.agent.foundry_agent import FoundryAgentRunner
 from app.agent.tool_registry import build_registry
+from app.azure.chat import ChatService
 from app.azure.document_intelligence import DocumentIntelligenceService
 from app.azure.embeddings import EmbeddingService
 from app.azure.search import SearchService
 from app.config import Settings, get_settings
 from app.db.engagements import EngagementStore
 from app.db.reviews import ReviewRepository
+from app.services.ask_service import AskService
 from app.services.engagement_data import EngagementDataRepository
 from app.services.engagement_service import EngagementService
 from app.services.ingestion import IngestionService
@@ -67,11 +69,23 @@ def build_processing_service(settings: Settings) -> ProcessingService:
     )
 
 
-def build_review_service(settings: Settings) -> ReviewService:
-    search_tool = SearchEvidenceTool(
+def build_search_tool(settings: Settings) -> SearchEvidenceTool:
+    return SearchEvidenceTool(
         embeddings=EmbeddingService.from_settings(settings),
         search=SearchService.from_settings(settings),
     )
+
+
+def build_ask_service(settings: Settings) -> AskService:
+    return AskService(
+        engagements=EngagementDataRepository(uploads_root(settings)),
+        search_evidence=build_search_tool(settings),
+        chat=ChatService.from_settings(settings),
+    )
+
+
+def build_review_service(settings: Settings) -> ReviewService:
+    search_tool = build_search_tool(settings)
     return ReviewService(
         engagements=EngagementDataRepository(uploads_root(settings)),
         registry=build_registry(search_evidence=search_tool),
@@ -93,3 +107,8 @@ def get_processing_service() -> ProcessingService:
 @lru_cache
 def get_review_service() -> ReviewService:
     return build_review_service(get_settings())
+
+
+@lru_cache
+def get_ask_service() -> AskService:
+    return build_ask_service(get_settings())

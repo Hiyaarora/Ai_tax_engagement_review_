@@ -257,3 +257,56 @@ def test_run_review_requires_readiness_then_queues(api):
         client.get(f"/api/engagements/{engagement_id}").json()["latest_review"]["review_id"]
         == "rev_new"
     )
+
+
+class _FakeAsk:
+    def __init__(self) -> None:
+        self.questions: list[tuple[str, str]] = []
+
+    def ask(self, engagement_id: str, question: str):
+        from app.models.review import CitationGuardReport
+        from app.services.ask_service import AskResult
+
+        self.questions.append((engagement_id, question))
+        return AskResult(
+            engagement_id=engagement_id,
+            question=question,
+            answer="Yes.",
+            found_in_documents=True,
+            citations=[],
+            passages=[],
+            citation_guard=CitationGuardReport(),
+            model="gpt-4.1-mini",
+        )
+
+
+def test_ask_requires_readiness_then_answers(api):
+    from app.api.dependencies import get_ask_service
+
+    client, engagements, _, _ = api
+    fake = _FakeAsk()
+    client.app.dependency_overrides[get_ask_service] = lambda: fake
+    engagement_id = _create(client)
+
+    assert (
+        client.post(f"/api/engagements/{engagement_id}/ask", json={"question": "x"}).status_code
+        == 409
+    )
+
+    client.post(
+        f"/api/engagements/{engagement_id}/documents",
+        files={"file": ("a.pdf", b"%PDF", "application/pdf")},
+    )
+    engagements.store.set_document_status(engagement_id, "a.pdf", "indexed", pages=1, chunks=1)
+    r = client.post(
+        f"/api/engagements/{engagement_id}/ask", json={"question": "Inventory in Texas?"}
+    )
+
+    assert r.status_code == 200, r.text
+    assert r.json()["answer"] == "Yes." and "not tax advice" in r.json()["disclaimer"].lower()
+    assert fake.questions == [(engagement_id, "Inventory in Texas?")]
+    assert (
+        client.post(f"/api/engagements/{engagement_id}/ask", json={"question": "  "}).status_code
+        == 422
+    )
+    assert client.post("/api/engagements/ghost-2025/ask", json={"question": "x"}).status_code == 404

@@ -58,8 +58,15 @@ def _guard_finding(
     return finding
 
 
+def guard_citations(
+    citations: list[Citation], ctx: ReviewContext, report: CitationGuardReport
+) -> list[Citation]:
+    """Apply the citation rules to any list of citations (reviews and grounded answers alike)."""
+    return [c for c in (_guard_citation(c, ctx, report) for c in citations) if c]
+
+
 def _guard_flag(flag: RiskFlag, ctx: ReviewContext, report: CitationGuardReport) -> RiskFlag:
-    citations = [c for c in (_guard_citation(c, ctx, report) for c in flag.retrieved_evidence) if c]
+    citations = guard_citations(flag.retrieved_evidence, ctx, report)
     findings = [f for f in (_guard_finding(f, ctx, report) for f in flag.tool_findings) if f]
     if not citations and not findings:
         report.flags_without_evidence.append(flag.id)

@@ -1,4 +1,5 @@
 import type {
+  AskResult,
   Decision,
   DocType,
   DocumentRecord,
@@ -74,6 +75,12 @@ export const api = {
       `/engagements/${enc(id)}/demo-files`,
       { method: 'POST' },
     ),
+
+  ask: (id: string, question: string) =>
+    request<AskResult>(`/engagements/${enc(id)}/ask`, {
+      method: 'POST',
+      body: JSON.stringify({ question }),
+    }),
 
   // shared reference guidance
   referenceStatus: () => request<ReferenceStatus>('/reference'),
