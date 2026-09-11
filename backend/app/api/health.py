@@ -3,6 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
+from app.azure.connectivity import Probe, ServiceCheck, default_probes, run_checks
 from app.config import Settings, get_settings
 
 router = APIRouter(tags=["health"])
@@ -22,6 +23,16 @@ class HealthResponse(BaseModel):
     azure: AzureConfigState
 
 
+class AzureConnectivityResponse(BaseModel):
+    all_reachable: bool
+    services: list[ServiceCheck]
+
+
+def get_probes(settings: Annotated[Settings, Depends(get_settings)]) -> dict[str, Probe]:
+    """Dependency so tests can swap the real Azure probes for fakes."""
+    return default_probes(settings)
+
+
 @router.get("/health", response_model=HealthResponse)
 def health(settings: Annotated[Settings, Depends(get_settings)]) -> HealthResponse:
     """Liveness check. Reports which Azure services are configured (booleans only, no endpoints)."""
@@ -36,3 +47,16 @@ def health(settings: Annotated[Settings, Depends(get_settings)]) -> HealthRespon
             document_intelligence=settings.document_intelligence_configured,
         ),
     )
+
+
+@router.get("/health/azure", response_model=AzureConnectivityResponse)
+def health_azure(
+    settings: Annotated[Settings, Depends(get_settings)],
+    probes: Annotated[dict[str, Probe], Depends(get_probes)],
+) -> AzureConnectivityResponse:
+    """Readiness check: one cheap authenticated call per configured Azure service.
+
+    Makes real network calls with DefaultAzureCredential - slower than /health, use deliberately.
+    """
+    report = run_checks(settings, probes=probes)
+    return AzureConnectivityResponse(all_reachable=report.all_reachable, services=report.services)

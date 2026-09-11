@@ -26,3 +26,15 @@ def test_configured_flags_flip_when_endpoints_present():
 def test_cors_origins_parse_from_comma_separated_string():
     settings = Settings(_env_file=None, cors_origins="http://a.test, http://b.test")
     assert settings.cors_origins == ["http://a.test", "http://b.test"]
+
+
+def test_foundry_resource_endpoint_is_derived_from_project_endpoint():
+    settings = Settings(
+        _env_file=None,
+        foundry_project_endpoint="https://example.services.ai.azure.com/api/projects/my-proj",
+    )
+    assert settings.foundry_resource_endpoint == "https://example.services.ai.azure.com"
+
+
+def test_foundry_resource_endpoint_is_empty_when_project_endpoint_unset():
+    assert Settings(_env_file=None).foundry_resource_endpoint == ""

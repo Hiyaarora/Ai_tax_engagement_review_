@@ -48,6 +48,15 @@ class Settings(BaseSettings):
         return bool(self.foundry_project_endpoint and self.foundry_agent_id)
 
     @property
+    def foundry_resource_endpoint(self) -> str:
+        """The AI Services resource that hosts the project's model deployments.
+
+        Model inference (chat, embeddings) is served at ``{resource}/openai/v1``, not under the
+        project path, so derive it from the project endpoint rather than adding a second setting.
+        """
+        return self.foundry_project_endpoint.split("/api/projects/")[0].rstrip("/")
+
+    @property
     def search_configured(self) -> bool:
         return bool(self.azure_search_endpoint)
 
