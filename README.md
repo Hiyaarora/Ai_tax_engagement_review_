@@ -89,6 +89,30 @@ uv run python -m scripts.check_azure
 The same check is exposed at `GET /api/health/azure` (makes real Azure calls; `GET /api/health` stays
 offline and only reports what is configured).
 
+## Synthetic data, index and ingestion (Milestone 2)
+
+All demo documents are generated from one Python dataset ([backend/scripts/synthetic/dataset.py](backend/scripts/synthetic/dataset.py))
+so the numbers in every file agree, and are deliberately inconsistent with each other in ways a
+reviewer should catch (Texas inventory but no Texas registration; "no employees outside Colorado"
+vs. two remote employees in Washington; Texas and Washington sales over the illustrative thresholds).
+
+```bash
+cd backend
+uv run python -m scripts.synthetic.generate       # -> data/synthetic/*.pdf, *.docx, *.csv (committed)
+uv run python -m scripts.create_search_index      # idempotent; schema in app/azure/search.py
+uv run python -m scripts.ingest_documents --demo  # DI layout -> chunks -> embeddings -> AI Search
+uv run python -m scripts.query_evidence "Does the company hold inventory in Texas?"
+```
+
+Ingestion indexes the questionnaire and locations documents under engagement `acme-2025` and the
+reference guide under the shared id `shared`; every query is filtered to
+`engagement_id eq '<id>' or engagement_id eq 'shared'`. The sales CSV is **not** indexed - it is
+structured data for the deterministic tools in Milestone 3.
+
+Pipeline notes: Document Intelligence lists table cells both as paragraphs and inside tables, so the
+parser drops paragraphs that fall inside a table span and keeps DI's reading order; chunks never
+cross a page and default to ~1000 characters so one questionnaire section is one citable chunk.
+
 ## Run the backend
 
 ```bash
@@ -138,7 +162,7 @@ Azure SDK clients are wrapped once in `backend/app/azure/` (`credential.py`, `do
 1. **Scaffold** — structure, FastAPI, React, config, health endpoint, tests ✅
 2. **Provision + ingest + RAG** — AI Search (Basic), Document Intelligence, embeddings deployment, synthetic data, ingestion pipeline, `search_evidence`
    - Stage 1 ✅ Azure resources provisioned; keyless SDK wrappers; connectivity check (`scripts/check_azure.py`, `/api/health/azure`)
-   - Stage 2 — synthetic data, chunking, index creation, embeddings, `search_evidence`
+   - Stage 2 ✅ synthetic data generator, page-aware chunking, `fd-evidence` index, ingestion pipeline, `search_evidence` tool
 3. **Agent loop** — deterministic tools, Foundry run/tool dispatch, `ReviewResult` schema, citation guard, SQLite
 4. **Review UI** — upload, run review, flags with evidence, human accept/reject
 5. **Observability** — OpenTelemetry traces into Foundry

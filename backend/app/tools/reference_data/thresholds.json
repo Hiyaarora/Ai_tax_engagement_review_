@@ -1,0 +1,12 @@
+{
+  "_notice": "SYNTHETIC / ILLUSTRATIVE economic nexus thresholds for a demo. NOT real law. Do not rely on these values.",
+  "measurement_period": "previous or current calendar year",
+  "states": {
+    "CA": {"name": "California", "sales_threshold": 500000, "transaction_threshold": null, "rule": "sales"},
+    "CO": {"name": "Colorado", "sales_threshold": 100000, "transaction_threshold": null, "rule": "sales"},
+    "FL": {"name": "Florida", "sales_threshold": 100000, "transaction_threshold": null, "rule": "sales"},
+    "NY": {"name": "New York", "sales_threshold": 500000, "transaction_threshold": 100, "rule": "sales_and_transactions"},
+    "TX": {"name": "Texas", "sales_threshold": 500000, "transaction_threshold": null, "rule": "sales"},
+    "WA": {"name": "Washington", "sales_threshold": 100000, "transaction_threshold": 200, "rule": "sales_or_transactions"}
+  }
+}
