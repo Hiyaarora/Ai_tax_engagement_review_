@@ -156,8 +156,24 @@ Guarantees worth knowing:
 - **Structured output**: `ReviewDraft` is enforced by Foundry (strict JSON schema) and re-validated with
   Pydantic. `human_review_required` is a `Literal[True]` the model cannot set.
 
-Endpoints: `POST /api/engagements/{id}/reviews` (synchronous, returns `ReviewResult`),
-`GET /api/reviews/{review_id}`, `GET /api/engagements/{id}/reviews`.
+Endpoints: `GET /api/engagements`, `POST /api/engagements/{id}/reviews` (synchronous, returns
+`ReviewResult`), `GET /api/engagements/{id}/reviews`, `GET /api/reviews/{review_id}` (result +
+decisions), `PATCH /api/reviews/{review_id}/flags/{flag_id}` (reviewer decision).
+
+## The review UI (Milestone 4)
+
+Two pages, plain React + CSS, hash routing, no UI library:
+
+- **Engagements** (`#/`) — company, home state, indexed documents, past reviews, and **Run review**
+  (synchronous; the page shows progress for the 30–90 s the agent takes, then opens the result).
+- **Review** (`#/reviews/<id>`) — overall summary and risk level, the citation-guard notes, and one
+  card per flag. Each card keeps the three kinds of information in separate, colour-coded regions —
+  **Retrieved evidence** (source, page, `chunk_id`, verbatim quote), **Computed from client data**
+  (tool name + figure) and **AI analysis** — followed by the recommended human action and the
+  reviewer's decision (**Accept / Reject / Needs more info** + note), persisted via
+  `PATCH /api/reviews/{id}/flags/{flag_id}`. A counter shows how many flags still need a decision.
+
+Run the backend (below), then `cd frontend && npm run dev` and open http://localhost:5173.
 
 ## Run the backend
 
@@ -210,7 +226,7 @@ Azure SDK clients are wrapped once in `backend/app/azure/` (`credential.py`, `do
    - Stage 1 ✅ Azure resources provisioned; keyless SDK wrappers; connectivity check (`scripts/check_azure.py`, `/api/health/azure`)
    - Stage 2 ✅ synthetic data generator, page-aware chunking, `fd-evidence` index, ingestion pipeline, `search_evidence` tool
 3. **Agent loop** — deterministic tools, Foundry agent + tool dispatch, `ReviewResult` schema, citation guard, SQLite, review API ✅
-4. **Review UI** — upload, run review, flags with evidence, human accept/reject
+4. **Review UI** — engagements, run review, flag cards with evidence separated from analysis, human decisions ✅
 5. **Observability** — OpenTelemetry traces into Foundry
 6. **Evaluation** — golden set, groundedness/relevance, flag recall, citation validity
 7. **Polish** — docs, demo script

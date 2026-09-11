@@ -40,6 +40,34 @@ class _FakeService:
     def get_review(self, review_id: str) -> ReviewResult | None:
         return self.saved.get(review_id)
 
+    def list_decisions(self, review_id: str):
+        return [d for d in getattr(self, "decisions", []) if d.review_id == review_id]
+
+    def decide_flag(self, decision):
+        from app.db.reviews import UnknownFlagError
+
+        if decision.flag_id != "TX-1":
+            raise UnknownFlagError(decision.flag_id)
+        self.decisions = [decision]
+        return decision
+
+    def list_engagements(self):
+        from app.services.engagement_data import EngagementDataRepository
+        from app.services.review_service import EngagementSummary
+        from tests.conftest import SYNTHETIC_ROOT
+
+        repo = EngagementDataRepository(SYNTHETIC_ROOT)
+        data = repo.load("acme-2025")
+        return [
+            EngagementSummary(
+                engagement_id="acme-2025",
+                company_name=data.company_name,
+                home_state=data.home_state,
+                tax_year=data.tax_year,
+                documents=[p.name for p in repo.document_paths("acme-2025")],
+            )
+        ]
+
     def list_reviews(self, engagement_id: str) -> list[ReviewSummary]:
         return [
             ReviewSummary(
@@ -91,7 +119,7 @@ def test_post_review_agent_failure_is_502_with_reason(api):
 
 def test_get_review_and_list(api):
     client, _ = api
-    assert client.get("/api/reviews/rev_abc").json()["engagement_id"] == "acme-2025"
+    assert client.get("/api/reviews/rev_abc").json()["review"]["engagement_id"] == "acme-2025"
     assert client.get("/api/reviews/missing").status_code == 404
     listed = client.get("/api/engagements/acme-2025/reviews").json()
     assert [r["review_id"] for r in listed] == ["rev_abc"]
@@ -100,3 +128,34 @@ def test_get_review_and_list(api):
 def test_invalid_engagement_id_shape_is_rejected_by_validation(api):
     client, _ = api
     assert client.post("/api/engagements/..%2Fetc/reviews").status_code in (404, 422)
+
+
+def test_list_engagements_returns_the_synthetic_engagement(api):
+    client, _ = api
+    body = client.get("/api/engagements").json()
+    acme = next(e for e in body if e["engagement_id"] == "acme-2025")
+    assert acme["company_name"] == "Acme Widgets LLC" and acme["tax_year"] == 2025
+    assert sorted(acme["documents"]) == ["locations.docx", "questionnaire.pdf"]
+
+
+def test_get_review_includes_decisions_and_patch_records_one(api):
+    client, fake = api
+    assert client.get("/api/reviews/rev_abc").json()["decisions"] == []
+
+    response = client.patch(
+        "/api/reviews/rev_abc/flags/TX-1",
+        json={"decision": "accepted", "reviewer_note": "confirmed"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["decision"] == "accepted"
+    detail = client.get("/api/reviews/rev_abc").json()
+    assert detail["decisions"][0]["flag_id"] == "TX-1"
+    assert (
+        client.patch("/api/reviews/rev_abc/flags/TX-1", json={"decision": "maybe"}).status_code
+        == 422
+    )
+    assert (
+        client.patch("/api/reviews/rev_abc/flags/NOPE", json={"decision": "rejected"}).status_code
+        == 404
+    )

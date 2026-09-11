@@ -3,6 +3,11 @@
   line-height: 1.5;
   color: #1f2937;
   background: #f9fafb;
+  --high: #b91c1c;
+  --medium: #b45309;
+  --low: #047857;
+  --border: #e5e7eb;
+  --muted: #6b7280;
 }
 
 body {
@@ -10,9 +15,21 @@ body {
 }
 
 main {
-  max-width: 720px;
+  max-width: 860px;
   margin: 0 auto;
   padding: 2rem 1rem;
+}
+
+h1 {
+  font-size: 1.5rem;
+}
+
+footer {
+  margin-top: 3rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.85rem;
+  color: var(--muted);
 }
 
 .disclaimer {
@@ -20,4 +37,257 @@ main {
   border-left: 4px solid #b45309;
   background: #fffbeb;
   color: #78350f;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+/* --- generic controls --- */
+button {
+  font: inherit;
+  cursor: pointer;
+  border: 1px solid #9ca3af;
+  border-radius: 4px;
+  background: #fff;
+  padding: 0.35rem 0.8rem;
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+button.primary {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+  color: #fff;
+  font-weight: 600;
+}
+
+button.link {
+  border: none;
+  background: none;
+  padding: 0;
+  color: #1d4ed8;
+  text-decoration: underline;
+}
+
+button.link--active {
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #fff;
+  vertical-align: middle;
+}
+
+.badge--high {
+  background: var(--high);
+}
+.badge--medium {
+  background: var(--medium);
+}
+.badge--low {
+  background: var(--low);
+}
+
+/* --- engagement page --- */
+.engagements {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  gap: 1rem;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.25rem 1rem;
+}
+
+.facts dt {
+  color: var(--muted);
+}
+
+.facts dd {
+  margin: 0;
+}
+
+.run {
+  margin: 1.5rem 0;
+}
+
+.status {
+  color: var(--muted);
+}
+
+.reviews {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.reviews th,
+.reviews td {
+  text-align: left;
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+/* --- review page --- */
+.summary {
+  font-size: 1.05rem;
+  padding: 0.75rem 1rem;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.guard {
+  padding: 0.5rem 1rem;
+  border: 1px dashed #9ca3af;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.guard h3 {
+  margin: 0.25rem 0;
+  font-size: 0.95rem;
+}
+
+/* --- flag card: the three information kinds are visually distinct --- */
+.flag {
+  margin: 1.25rem 0;
+  padding: 1rem;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-left-width: 6px;
+  border-radius: 6px;
+}
+
+.flag--high {
+  border-left-color: var(--high);
+}
+.flag--medium {
+  border-left-color: var(--medium);
+}
+.flag--low {
+  border-left-color: var(--low);
+}
+
+.flag__header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.flag__header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.flag__category {
+  margin-left: auto;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.flag__warning {
+  padding: 0.5rem 0.75rem;
+  background: #fef2f2;
+  color: #991b1b;
+  border-radius: 4px;
+}
+
+.flag__section {
+  margin-top: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+}
+
+.flag__section h4 {
+  margin: 0 0 0.25rem;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.flag__section:nth-of-type(1) {
+  background: #eff6ff; /* retrieved evidence: blue */
+}
+.flag__section:nth-of-type(2) {
+  background: #ecfdf5; /* computed: green */
+}
+.flag__analysis {
+  background: #f5f3ff; /* AI analysis: violet */
+}
+
+.evidence,
+.findings {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.evidence__source {
+  font-weight: 600;
+}
+
+.evidence__chunk {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.evidence blockquote {
+  margin: 0.25rem 0 0.5rem;
+  padding-left: 0.75rem;
+  border-left: 3px solid #93c5fd;
+  font-style: italic;
+}
+
+.flag__action {
+  margin: 0.75rem 0 0;
+}
+
+.flag__decision {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.flag__decision label {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  font-size: 0.9rem;
+}
+
+.flag__decision input {
+  flex: 1;
+  font: inherit;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid #9ca3af;
+  border-radius: 4px;
+}
+
+.flag__buttons {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+@media (max-width: 480px) {
+  .facts {
+    grid-template-columns: 1fr;
+  }
+  .flag__buttons {
+    flex-direction: column;
+  }
 }

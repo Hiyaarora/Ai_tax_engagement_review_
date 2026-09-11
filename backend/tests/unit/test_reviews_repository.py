@@ -63,3 +63,36 @@ def test_repository_creates_parent_directory_and_is_reopenable(tmp_path: Path):
     path = tmp_path / "nested" / "dir" / "r.db"
     ReviewRepository(path).save(_result("rev_1"))
     assert ReviewRepository(path).get("rev_1") is not None
+
+
+def test_flag_decisions_are_saved_per_review_and_flag_and_overwritable(tmp_path: Path):
+    from app.db.reviews import FlagDecision
+
+    repo = ReviewRepository(tmp_path / "r.db")
+    repo.save(_result("rev_1"))
+
+    repo.save_decision(
+        FlagDecision(review_id="rev_1", flag_id="TX-1", decision="accepted", reviewer_note="ok")
+    )
+    repo.save_decision(
+        FlagDecision(review_id="rev_1", flag_id="TX-1", decision="rejected", reviewer_note="no")
+    )
+
+    decisions = repo.list_decisions("rev_1")
+    assert len(decisions) == 1
+    assert decisions[0].decision == "rejected" and decisions[0].reviewer_note == "no"
+    assert decisions[0].decided_at is not None
+    assert repo.list_decisions("rev_other") == []
+
+
+def test_decision_for_unknown_review_or_flag_is_rejected(tmp_path: Path):
+    import pytest
+
+    from app.db.reviews import FlagDecision, UnknownFlagError
+
+    repo = ReviewRepository(tmp_path / "r.db")
+    repo.save(_result("rev_1"))
+    with pytest.raises(UnknownFlagError):
+        repo.save_decision(FlagDecision(review_id="rev_1", flag_id="NOPE", decision="accepted"))
+    with pytest.raises(UnknownFlagError):
+        repo.save_decision(FlagDecision(review_id="rev_x", flag_id="TX-1", decision="accepted"))
