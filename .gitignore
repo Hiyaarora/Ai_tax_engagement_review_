@@ -1,0 +1,31 @@
+# --- Secrets / local config ---
+.env
+.env.*
+!.env.example
+
+# --- Python (backend) ---
+backend/.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+backend/dist/
+
+# --- Node (frontend) ---
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+npm-debug.log*
+
+# --- Local data: uploads and SQLite are never committed; synthetic demo data is ---
+data/*
+!data/synthetic/
+!data/synthetic/**
+!data/.gitkeep
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
