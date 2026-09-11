@@ -1,0 +1,30 @@
+[
+  {
+    "city": "Denver",
+    "state": "CO",
+    "site_type": "Headquarters (owned office)",
+    "headcount": 38,
+    "note": ""
+  },
+  {
+    "city": "Seattle",
+    "state": "WA",
+    "site_type": "Remote employees (home offices)",
+    "headcount": 2,
+    "note": "Two engineers hired in 2025."
+  },
+  {
+    "city": "Dallas",
+    "state": "TX",
+    "site_type": "3PL warehouse (no employees)",
+    "headcount": 0,
+    "note": "Operated by third-party provider."
+  },
+  {
+    "city": "Austin",
+    "state": "TX",
+    "site_type": "Independent contractor",
+    "headcount": 0,
+    "note": "Not an employee; monthly customer visits."
+  }
+]

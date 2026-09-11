@@ -14,7 +14,7 @@ def test_configured_flags_flip_when_endpoints_present():
     settings = Settings(
         _env_file=None,
         foundry_project_endpoint="https://example.services.ai.azure.com/api/projects/p",
-        foundry_agent_id="asst_123",
+        foundry_agent_name="FDprojectAgent",
         azure_search_endpoint="https://example.search.windows.net",
         azure_document_intelligence_endpoint="https://example.cognitiveservices.azure.com/",
     )

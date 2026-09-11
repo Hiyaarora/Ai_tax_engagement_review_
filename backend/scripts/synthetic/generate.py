@@ -10,6 +10,7 @@ from __future__ import annotations
 import io
 import json
 import sys
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
@@ -33,11 +34,18 @@ from scripts.synthetic.dataset import (
 THRESHOLDS_PATH = Path(__file__).resolve().parents[2] / "app/tools/reference_data/thresholds.json"
 DEFAULT_OUTPUT_DIR = Path(__file__).resolve().parents[3] / "data/synthetic"
 
+ENGAGEMENT_DIR = f"engagements/{ENGAGEMENT_ID}"
+SHARED_DIR = "shared"
+
+# Relative to the output dir. Documents are indexed as evidence; .csv/.json feed the tools.
 OUTPUT_FILES = (
-    "acme_nexus_questionnaire.pdf",
-    "acme_sales_2025.csv",
-    "acme_employee_locations.docx",
-    "salt_reference_guide.pdf",
+    f"{ENGAGEMENT_DIR}/engagement.json",
+    f"{ENGAGEMENT_DIR}/questionnaire.pdf",
+    f"{ENGAGEMENT_DIR}/questionnaire.json",
+    f"{ENGAGEMENT_DIR}/locations.docx",
+    f"{ENGAGEMENT_DIR}/locations.json",
+    f"{ENGAGEMENT_DIR}/sales.csv",
+    f"{SHARED_DIR}/salt_reference_guide.pdf",
 )
 
 _styles = getSampleStyleSheet()
@@ -106,6 +114,32 @@ def write_sales_csv_file(path: Path) -> None:
         "ship-to state sales. Lines starting with # are comments.\n"
     )
     path.write_text(header + buffer.getvalue(), encoding="utf-8")
+
+
+def write_engagement_json(path: Path) -> None:
+    path.write_text(
+        json.dumps(
+            {
+                "engagement_id": ENGAGEMENT_ID,
+                "company_name": COMPANY.name,
+                "home_state": COMPANY.home_state,
+                "tax_year": TAX_YEAR,
+                "disclaimer": COMPANY.disclaimer,
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+
+def write_questionnaire_json(path: Path) -> None:
+    path.write_text(json.dumps([asdict(q) for q in questionnaire()], indent=2), encoding="utf-8")
+
+
+def write_locations_json(path: Path) -> None:
+    path.write_text(
+        json.dumps([asdict(loc) for loc in employee_locations()], indent=2), encoding="utf-8"
+    )
 
 
 def write_locations_docx(path: Path) -> None:
@@ -183,15 +217,19 @@ def write_reference_pdf(path: Path) -> None:
 def generate_all(output_dir: Path) -> list[Path]:
     output_dir.mkdir(parents=True, exist_ok=True)
     writers = {
-        "acme_nexus_questionnaire.pdf": write_questionnaire_pdf,
-        "acme_sales_2025.csv": write_sales_csv_file,
-        "acme_employee_locations.docx": write_locations_docx,
+        "engagement.json": write_engagement_json,
+        "questionnaire.pdf": write_questionnaire_pdf,
+        "questionnaire.json": write_questionnaire_json,
+        "locations.docx": write_locations_docx,
+        "locations.json": write_locations_json,
+        "sales.csv": write_sales_csv_file,
         "salt_reference_guide.pdf": write_reference_pdf,
     }
     written = []
-    for name in OUTPUT_FILES:
-        path = output_dir / name
-        writers[name](path)
+    for relative in OUTPUT_FILES:
+        path = output_dir / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        writers[path.name](path)
         written.append(path)
     return written
 

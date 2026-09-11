@@ -7,7 +7,7 @@ the citation guard (Milestone 3) checks every flag against.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.azure.embeddings import EmbeddingService
 from app.azure.search import SearchService
@@ -16,6 +16,8 @@ from app.models.evidence import DocType, EvidenceHit
 
 class SearchEvidenceArgs(BaseModel):
     """Arguments the agent provides. Doubles as the JSON schema pushed to Foundry."""
+
+    model_config = ConfigDict(extra="forbid")  # engagement_id etc. can never be smuggled in
 
     query: str = Field(
         min_length=1, description="Natural-language question or keywords to look up."

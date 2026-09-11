@@ -25,7 +25,7 @@ class Settings(BaseSettings):
 
     # --- Microsoft Foundry ---
     foundry_project_endpoint: str = ""
-    foundry_agent_id: str = ""
+    foundry_agent_name: str = "FDprojectAgent"
     foundry_chat_deployment: str = "gpt-4.1-mini"
     foundry_embedding_deployment: str = "text-embedding-3-small"
 
@@ -45,7 +45,7 @@ class Settings(BaseSettings):
 
     @property
     def foundry_configured(self) -> bool:
-        return bool(self.foundry_project_endpoint and self.foundry_agent_id)
+        return bool(self.foundry_project_endpoint and self.foundry_agent_name)
 
     @property
     def foundry_resource_endpoint(self) -> str:

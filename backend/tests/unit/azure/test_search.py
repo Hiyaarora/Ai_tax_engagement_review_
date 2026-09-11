@@ -210,3 +210,14 @@ def test_delete_document_chunks_removes_every_chunk_of_that_doc_in_that_engageme
         "engagement_id eq 'acme-2025' and doc_id eq 'doc1'"
     )
     assert client.search_client.deleted == [{"chunk_id": "doc1-p1-c0"}, {"chunk_id": "doc1-p2-c0"}]
+
+
+def test_recreate_index_deletes_then_creates():
+    client = _FakeIndexClientV2(["fd-evidence"])
+    client.deleted_indexes: list[str] = []  # type: ignore[attr-defined]
+    client.delete_index = lambda name: client.deleted_indexes.append(name)  # type: ignore[attr-defined]
+
+    _service(client).recreate_index()
+
+    assert client.deleted_indexes == ["fd-evidence"]  # type: ignore[attr-defined]
+    assert client.created[0].name == "fd-evidence"

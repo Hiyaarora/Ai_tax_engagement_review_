@@ -99,6 +99,12 @@ class SearchService:
         self._index_client.create_or_update_index(build_index_definition(self.index_name))
         return True
 
+    def recreate_index(self) -> None:
+        """Drop and re-create the index (schema change or full re-ingest). Destroys all chunks."""
+        if self.index_exists():
+            self._index_client.delete_index(self.index_name)
+        self._index_client.create_or_update_index(build_index_definition(self.index_name))
+
     def search_client(self) -> SearchClient:
         """Document-level client for the configured index."""
         return self._index_client.get_search_client(self.index_name)

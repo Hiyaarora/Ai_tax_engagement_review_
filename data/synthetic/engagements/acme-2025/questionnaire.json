@@ -1,0 +1,72 @@
+[
+  {
+    "id": "home_state",
+    "section": "General",
+    "question": "In which state is the company headquartered?",
+    "answer": "Colorado",
+    "note": "Denver office, incorporated in Colorado."
+  },
+  {
+    "id": "sales_channels",
+    "section": "General",
+    "question": "Through which channels does the company sell?",
+    "answer": "Own website, wholesale distributors, one online marketplace",
+    "note": ""
+  },
+  {
+    "id": "inventory_tx",
+    "section": "Physical presence",
+    "question": "Does the company hold inventory in Texas?",
+    "answer": "Yes",
+    "note": "Inventory is stored at a third-party logistics (3PL) warehouse in Dallas, Texas."
+  },
+  {
+    "id": "inventory_other",
+    "section": "Physical presence",
+    "question": "Does the company hold inventory in any other state outside Colorado?",
+    "answer": "No",
+    "note": ""
+  },
+  {
+    "id": "employees_outside_co",
+    "section": "Physical presence",
+    "question": "Does the company have employees who work from a location outside Colorado?",
+    "answer": "No",
+    "note": "All employees work from the Denver headquarters."
+  },
+  {
+    "id": "contractors",
+    "section": "Physical presence",
+    "question": "Does the company use independent contractors outside Colorado?",
+    "answer": "Yes",
+    "note": "One sales contractor visits customers in Texas roughly monthly."
+  },
+  {
+    "id": "registered_co",
+    "section": "Registrations",
+    "question": "Is the company registered to collect sales tax in Colorado?",
+    "answer": "Yes",
+    "note": ""
+  },
+  {
+    "id": "registered_tx",
+    "section": "Registrations",
+    "question": "Is the company registered to collect sales tax in Texas?",
+    "answer": "No",
+    "note": "Management believes the 3PL arrangement does not require registration."
+  },
+  {
+    "id": "registered_other",
+    "section": "Registrations",
+    "question": "Is the company registered to collect sales tax in any other state?",
+    "answer": "No",
+    "note": ""
+  },
+  {
+    "id": "marketplace",
+    "section": "Registrations",
+    "question": "Does the online marketplace collect sales tax on the company's behalf?",
+    "answer": "Yes",
+    "note": "Marketplace sales are roughly 10% of revenue."
+  }
+]

@@ -6,7 +6,7 @@ Decision support only - not tax advice. All demo data is synthetic.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import health
+from app.api import health, reviews
 from app.config import get_settings
 
 API_PREFIX = "/api"
@@ -33,6 +33,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(health.router, prefix=API_PREFIX)
+    app.include_router(reviews.router, prefix=API_PREFIX)
     return app
 
 

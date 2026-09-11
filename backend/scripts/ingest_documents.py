@@ -1,12 +1,13 @@
 """Ingest documents into the evidence index.
 
 Usage (from backend/):
-  uv run python -m scripts.ingest_documents --demo
-  uv run python -m scripts.ingest_documents --file ../data/synthetic/x.pdf
-      --engagement acme-2025 --doc-type questionnaire
+  uv run python -m scripts.ingest_documents --demo                 # every engagement + shared docs
+  uv run python -m scripts.ingest_documents --engagement acme-2025 # one engagement's documents
+  uv run python -m scripts.ingest_documents --file x.pdf --engagement acme-2025 --doc-type other
 
-``--demo`` ingests the synthetic engagement: questionnaire + locations under 'acme-2025' and the
-reference guide under the shared id. The sales CSV is deliberately not indexed (tool data).
+Documents are read from data/synthetic/engagements/<id>/ (doc type inferred from the file stem:
+``questionnaire`` / ``locations``) and data/synthetic/shared/ (indexed as ``reference`` under the
+shared id). The sales CSV is deliberately not indexed - it is tool data.
 """
 
 from __future__ import annotations
@@ -19,17 +20,15 @@ from app.azure.embeddings import EmbeddingService
 from app.azure.search import SearchService
 from app.config import get_settings
 from app.models.evidence import SHARED_ENGAGEMENT_ID, DocType
-from app.services.ingestion import IngestionService
+from app.services.engagement_data import EngagementDataRepository
+from app.services.ingestion import INDEXABLE_SUFFIXES, IngestionService
 
-SYNTHETIC_DIR = Path(__file__).resolve().parents[2] / "data/synthetic"
-DEMO_ENGAGEMENT_ID = "acme-2025"
+SYNTHETIC_ROOT = Path(__file__).resolve().parents[2] / "data/synthetic"
+_DOC_TYPE_BY_STEM: dict[str, DocType] = {"questionnaire": "questionnaire", "locations": "locations"}
 
-# (file name, engagement id, doc type)
-DEMO_MANIFEST: list[tuple[str, str, DocType]] = [
-    ("acme_nexus_questionnaire.pdf", DEMO_ENGAGEMENT_ID, "questionnaire"),
-    ("acme_employee_locations.docx", DEMO_ENGAGEMENT_ID, "locations"),
-    ("salt_reference_guide.pdf", SHARED_ENGAGEMENT_ID, "reference"),
-]
+
+def doc_type_for(path: Path) -> DocType:
+    return _DOC_TYPE_BY_STEM.get(path.stem.lower(), "other")
 
 
 def build_service() -> IngestionService:
@@ -41,20 +40,43 @@ def build_service() -> IngestionService:
     )
 
 
+def engagement_jobs(
+    repo: EngagementDataRepository, engagement_id: str
+) -> list[tuple[Path, str, DocType]]:
+    return [(p, engagement_id, doc_type_for(p)) for p in repo.document_paths(engagement_id)]
+
+
+def shared_jobs(root: Path) -> list[tuple[Path, str, DocType]]:
+    shared = root / "shared"
+    if not shared.is_dir():
+        return []
+    return [
+        (p, SHARED_ENGAGEMENT_ID, "reference")
+        for p in sorted(shared.iterdir())
+        if p.suffix.lower() in INDEXABLE_SUFFIXES
+    ]
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--demo", action="store_true", help="ingest the synthetic demo engagement")
-    parser.add_argument("--file", type=Path)
+    parser.add_argument("--demo", action="store_true", help="ingest all engagements + shared docs")
     parser.add_argument("--engagement")
+    parser.add_argument("--file", type=Path)
     parser.add_argument("--doc-type", choices=["questionnaire", "locations", "reference", "other"])
     args = parser.parse_args(argv)
 
+    repo = EngagementDataRepository(SYNTHETIC_ROOT)
+    jobs: list[tuple[Path, str, DocType]]
     if args.demo:
-        jobs = [(SYNTHETIC_DIR / name, eng, dt) for name, eng, dt in DEMO_MANIFEST]
+        jobs = shared_jobs(SYNTHETIC_ROOT)
+        for engagement_id in repo.list_ids():
+            jobs += engagement_jobs(repo, engagement_id)
     elif args.file and args.engagement and args.doc_type:
         jobs = [(args.file, args.engagement, args.doc_type)]
+    elif args.engagement:
+        jobs = engagement_jobs(repo, args.engagement)
     else:
-        parser.error("use --demo, or all of --file, --engagement and --doc-type")
+        parser.error("use --demo, --engagement <id>, or --file/--engagement/--doc-type")
 
     service = build_service()
     for path, engagement_id, doc_type in jobs:
