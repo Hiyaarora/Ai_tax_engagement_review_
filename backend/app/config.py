@@ -20,8 +20,9 @@ class Settings(BaseSettings):
     app_version: str = "0.1.0"
     app_env: Literal["development", "test", "production"] = "development"
     cors_origins: list[str] = ["http://localhost:5173"]
-    data_dir: str = "../data"
+    data_dir: str = "../data"  # uploads/ (user files, ignored) and synthetic/ (fixtures) live here
     database_url: str = "sqlite:///../data/fd_tax_review.db"
+    max_upload_mb: int = 25
 
     # --- Microsoft Foundry ---
     foundry_project_endpoint: str = ""

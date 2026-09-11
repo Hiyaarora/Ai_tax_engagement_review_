@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from app.agent.foundry_agent import AgentRunOutcome
+from app.agent.foundry_agent import AgentRunError, AgentRunOutcome
 from app.agent.tool_registry import build_registry
 from app.db.reviews import ReviewRepository
 from app.models.evidence import EvidenceHit
@@ -141,12 +141,14 @@ def test_fenced_json_is_accepted(tmp_path: Path):
     assert _service(tmp_path, runner).run_review("acme-2025").overall_risk_level == "high"
 
 
-def test_invalid_draft_raises_parse_error_and_persists_nothing(tmp_path: Path):
+def test_invalid_draft_raises_parse_error_and_records_a_failed_review(tmp_path: Path):
     runner = _ScriptedRunner('{"overall_summary": "missing everything"}', [])
     service = _service(tmp_path, runner)
     with pytest.raises(ReviewParseError):
         service.run_review("acme-2025")
-    assert service.list_reviews("acme-2025") == []
+    [summary] = service.list_reviews("acme-2025")
+    assert summary.status == "failed" and "ReviewParseError" in (summary.error or "")
+    assert service.get_review(summary.review_id) is None
 
 
 def test_unknown_engagement_is_rejected_before_calling_the_agent(tmp_path: Path):
@@ -154,3 +156,38 @@ def test_unknown_engagement_is_rejected_before_calling_the_agent(tmp_path: Path)
     with pytest.raises(EngagementNotFoundError):
         _service(tmp_path, runner).run_review("../etc")
     assert runner.prompts == []
+
+
+def test_start_then_execute_records_status_transitions(tmp_path: Path):
+    runner = _ScriptedRunner(_draft_json(), [("analyze_sales_by_state", "{}")])
+    service = _service(tmp_path, runner)
+
+    review_id = service.start_review("acme-2025")
+    assert service.get_record(review_id).status == "queued"  # type: ignore[union-attr]
+
+    service.execute_review(review_id)
+
+    record = service.get_record(review_id)
+    assert record is not None and record.status == "done" and record.result is not None
+    assert record.result.review_id == review_id
+
+
+def test_execute_marks_failed_when_agent_errors_and_does_not_raise(tmp_path: Path):
+    class _ExplodingRunner(_ScriptedRunner):
+        def run(self, user_input, dispatch):
+            raise AgentRunError("agent response r1 failed")
+
+    service = _service(tmp_path, _ExplodingRunner(_draft_json(), []))
+    review_id = service.start_review("acme-2025")
+
+    service.execute_review(review_id)
+
+    record = service.get_record(review_id)
+    assert record.status == "failed" and "agent response r1 failed" in (record.error or "")  # type: ignore[union-attr]
+
+
+def test_start_review_rejects_unknown_engagement_before_queueing(tmp_path: Path):
+    service = _service(tmp_path, _ScriptedRunner(_draft_json(), []))
+    with pytest.raises(EngagementNotFoundError):
+        service.start_review("ghost-2025")
+    assert service.list_reviews("ghost-2025") == []

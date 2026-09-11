@@ -82,8 +82,15 @@ export interface FlagDecision {
   decided_at: string
 }
 
+export type ReviewStatus = 'queued' | 'running' | 'done' | 'failed'
+
+/** A review at any point in its lifecycle; `review` is set only when status is `done`. */
 export interface ReviewDetail {
-  review: ReviewResult
+  review_id: string
+  engagement_id: string
+  status: ReviewStatus
+  error: string | null
+  review: ReviewResult | null
   decisions: FlagDecision[]
 }
 
@@ -91,15 +98,50 @@ export interface ReviewSummary {
   review_id: string
   engagement_id: string
   created_at: string
-  overall_risk_level: RiskLevel
+  status: ReviewStatus
+  error: string | null
+  overall_risk_level: RiskLevel | null
   flag_count: number
-  model: string
+  model: string | null
 }
 
-export interface EngagementSummary {
+export type FileKind = 'document' | 'sales_csv' | 'questionnaire_json' | 'locations_json'
+export type DocumentStatus = 'uploaded' | 'processing' | 'indexed' | 'validated' | 'failed'
+export type DocType = 'questionnaire' | 'locations' | 'reference' | 'other'
+
+export interface DocumentRecord {
+  engagement_id: string
+  file_name: string
+  original_name: string
+  kind: FileKind
+  doc_type: DocType
+  status: DocumentStatus
+  pages: number | null
+  chunks: number | null
+  error: string | null
+  updated_at: string
+}
+
+export interface EngagementRecord {
   engagement_id: string
   company_name: string
   home_state: string
   tax_year: number
-  documents: string[]
+  created_at: string
+}
+
+/** Backend-owned readiness: the UI never computes can_ask / can_review itself. */
+export interface EngagementDetail {
+  engagement: EngagementRecord
+  documents: DocumentRecord[]
+  can_ask: boolean
+  can_review: boolean
+  latest_review: ReviewSummary | null
+}
+
+export interface ReferenceStatus {
+  indexed: boolean
+  status: 'not_indexed' | 'processing' | 'indexed' | 'failed'
+  chunks: number
+  error: string | null
 }

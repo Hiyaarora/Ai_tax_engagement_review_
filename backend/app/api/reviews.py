@@ -4,25 +4,43 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Path, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Path, status
 from pydantic import BaseModel
 
-from app.agent.foundry_agent import AgentRunError
-from app.api.dependencies import get_review_service
-from app.db.reviews import Decision, FlagDecision, ReviewSummary, UnknownFlagError
+from app.api.dependencies import get_engagement_service, get_review_service
+from app.db.reviews import (
+    Decision,
+    FlagDecision,
+    ReviewStatus,
+    ReviewSummary,
+    UnknownFlagError,
+)
 from app.models.engagement import ENGAGEMENT_ID_PATTERN
 from app.models.review import ReviewResult
 from app.services.engagement_data import EngagementNotFoundError
-from app.services.review_service import EngagementSummary, ReviewParseError, ReviewService
+from app.services.engagement_service import EngagementService
+from app.services.review_service import ReviewService
 
 router = APIRouter(tags=["reviews"])
 
 EngagementId = Annotated[str, Path(pattern=ENGAGEMENT_ID_PATTERN)]
 Service = Annotated[ReviewService, Depends(get_review_service)]
+Engagements = Annotated[EngagementService, Depends(get_engagement_service)]
+
+
+class ReviewQueued(BaseModel):
+    review_id: str
+    status: ReviewStatus
 
 
 class ReviewDetail(BaseModel):
-    review: ReviewResult
+    """A review at any point in its lifecycle; ``review`` is set only when ``status == done``."""
+
+    review_id: str
+    engagement_id: str
+    status: ReviewStatus
+    error: str | None
+    review: ReviewResult | None
     decisions: list[FlagDecision]
 
 
@@ -31,27 +49,32 @@ class DecisionRequest(BaseModel):
     reviewer_note: str = ""
 
 
-@router.get("/engagements", response_model=list[EngagementSummary])
-def list_engagements(service: Service) -> list[EngagementSummary]:
-    return service.list_engagements()
-
-
 @router.post(
     "/engagements/{engagement_id}/reviews",
-    response_model=ReviewResult,
-    status_code=status.HTTP_201_CREATED,
+    response_model=ReviewQueued,
+    status_code=status.HTTP_202_ACCEPTED,
 )
-def run_review(engagement_id: EngagementId, service: Service) -> ReviewResult:
-    """Run the review agent for one engagement and return the guarded, persisted result.
+def run_review(
+    engagement_id: EngagementId,
+    background: BackgroundTasks,
+    service: Service,
+    engagements: Engagements,
+) -> ReviewQueued:
+    """Queue the review agent for one engagement; poll GET /reviews/{id} for the result.
 
-    Synchronous by design for this demo (typically 30-90 s). Decision support only - not tax advice.
+    Decision support only - not tax advice.
     """
     try:
-        return service.run_review(engagement_id)
+        if not engagements.detail(engagement_id).can_review:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                "engagement is not ready for review: index at least one document first",
+            )
+        review_id = service.start_review(engagement_id)
     except EngagementNotFoundError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"unknown engagement {exc}") from exc
-    except (AgentRunError, ReviewParseError) as exc:
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"review agent error: {exc}") from exc
+    background.add_task(service.execute_review, review_id)
+    return ReviewQueued(review_id=review_id, status="queued")
 
 
 @router.get("/engagements/{engagement_id}/reviews", response_model=list[ReviewSummary])
@@ -61,10 +84,17 @@ def list_reviews(engagement_id: EngagementId, service: Service) -> list[ReviewSu
 
 @router.get("/reviews/{review_id}", response_model=ReviewDetail)
 def get_review(review_id: str, service: Service) -> ReviewDetail:
-    result = service.get_review(review_id)
-    if result is None:
+    record = service.get_record(review_id)
+    if record is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"unknown review {review_id}")
-    return ReviewDetail(review=result, decisions=service.list_decisions(review_id))
+    return ReviewDetail(
+        review_id=record.review_id,
+        engagement_id=record.engagement_id,
+        status=record.status,
+        error=record.error,
+        review=record.result,
+        decisions=service.list_decisions(review_id) if record.status == "done" else [],
+    )
 
 
 @router.patch("/reviews/{review_id}/flags/{flag_id}", response_model=FlagDecision)

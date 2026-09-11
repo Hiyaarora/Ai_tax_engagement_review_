@@ -1,15 +1,8 @@
 import { useEffect, useState } from 'react'
 import { HealthStatus } from './components/HealthStatus'
-import { EngagementPage } from './pages/EngagementPage'
-import { ReviewPage } from './pages/ReviewPage'
-
-type Route = { page: 'engagements' } | { page: 'review'; reviewId: string }
-
-// Two pages, so a hash router is enough - no routing dependency.
-function parseRoute(hash: string): Route {
-  const match = /^#\/reviews\/([A-Za-z0-9_-]+)$/.exec(hash)
-  return match ? { page: 'review', reviewId: match[1] } : { page: 'engagements' }
-}
+import { HomePage } from './pages/HomePage'
+import { WorkspacePage } from './pages/WorkspacePage'
+import { parseRoute, type Route } from './routes'
 
 export default function App() {
   const [route, setRoute] = useState<Route>(() => parseRoute(window.location.hash))
@@ -20,16 +13,13 @@ export default function App() {
     return () => window.removeEventListener('hashchange', onChange)
   }, [])
 
-  const openReview = (reviewId: string) => {
-    window.location.hash = `#/reviews/${reviewId}`
-  }
-  const back = () => {
-    window.location.hash = '#/'
+  const go = (hash: string) => {
+    window.location.hash = hash
   }
 
   return (
     <main>
-      <header>
+      <header className="masthead">
         <h1>F&amp;D Tax Engagement Review Agent</h1>
         <p className="disclaimer">
           Decision support only — not tax advice. All data in this application is synthetic.
@@ -37,10 +27,18 @@ export default function App() {
         </p>
       </header>
 
-      {route.page === 'review' ? (
-        <ReviewPage reviewId={route.reviewId} onBack={back} />
+      {route.page === 'workspace' ? (
+        <WorkspacePage
+          engagementId={route.engagementId}
+          step={route.step}
+          reviewId={route.reviewId}
+          onNavigate={(step, reviewId) =>
+            go(`#/e/${route.engagementId}/${step}${reviewId ? `/${reviewId}` : ''}`)
+          }
+          onHome={() => go('#/')}
+        />
       ) : (
-        <EngagementPage onOpenReview={openReview} />
+        <HomePage onOpen={(id) => go(`#/e/${id}/documents`)} />
       )}
 
       <footer>

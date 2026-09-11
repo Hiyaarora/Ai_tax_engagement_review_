@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { api } from '../api/client'
 import { RiskFlagCard } from '../components/RiskFlagCard'
+import { StatusBadge } from '../components/StatusBadge'
+import { usePolling } from '../hooks/usePolling'
 import type { CitationGuardReport, Decision, FlagDecision, ReviewDetail } from '../types'
 
 interface Props {
   reviewId: string
-  onBack: () => void
+  pollMs?: number
 }
 
 function guardNotes(report: CitationGuardReport): string[] {
@@ -24,51 +26,58 @@ function guardNotes(report: CitationGuardReport): string[] {
   return notes
 }
 
-export function ReviewPage({ reviewId, onBack }: Props) {
+/** Findings for one review. Polls while the review is queued/running, then renders the result. */
+export function FindingsView({ reviewId, pollMs = 3000 }: Props) {
   const [detail, setDetail] = useState<ReviewDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    api
-      .getReview(reviewId)
-      .then(setDetail)
-      .catch((err: Error) => setError(err.message))
+  const load = useCallback(() => {
+    api.getReview(reviewId).then(setDetail).catch((e: Error) => setError(e.message))
   }, [reviewId])
+
+  useEffect(load, [load])
+  usePolling(load, detail?.status === 'queued' || detail?.status === 'running', pollMs)
 
   async function decide(flagId: string, decision: Decision, note: string) {
     const saved: FlagDecision = await api.decideFlag(reviewId, flagId, decision, note)
     setDetail((current) =>
       current
-        ? {
-            ...current,
-            decisions: [...current.decisions.filter((d) => d.flag_id !== flagId), saved],
-          }
+        ? { ...current, decisions: [...current.decisions.filter((d) => d.flag_id !== flagId), saved] }
         : current,
     )
   }
 
   if (error) return <p role="alert">{error}</p>
-  if (!detail) return <p>Loading review…</p>
+  if (!detail) return <p className="muted">Loading review…</p>
+  if (detail.status === 'failed') {
+    return (
+      <p role="alert">
+        Review {detail.review_id} failed: {detail.error}
+      </p>
+    )
+  }
+  if (detail.status !== 'done' || !detail.review) {
+    return (
+      <p className="status">
+        <StatusBadge status={detail.status} /> Review is {detail.status} — retrieving evidence and
+        computing figures. This page updates automatically.
+      </p>
+    )
+  }
 
   const { review, decisions } = detail
-  const decided = decisions.length
   const notes = guardNotes(review.citation_guard)
 
   return (
     <section>
-      <button className="link" onClick={onBack}>
-        ← Engagements
-      </button>
       <header className="review__header">
-        <h2>
-          Review {review.review_id}{' '}
-          <span className={`badge badge--${review.overall_risk_level}`}>
-            {review.overall_risk_level.toUpperCase()}
-          </span>
-        </h2>
-        <p className="muted">
-          {review.engagement_id} · {new Date(review.created_at).toLocaleString()} · {review.model} via{' '}
-          {review.agent_name} · tools: {review.tool_calls.join(', ')}
+        <h3>
+          Findings for <code>{review.review_id}</code>{' '}
+          <StatusBadge status={review.overall_risk_level} />
+        </h3>
+        <p className="muted small">
+          {new Date(review.created_at).toLocaleString()} · {review.model} via {review.agent_name} ·
+          tools: {review.tool_calls.join(', ')}
         </p>
       </header>
 
@@ -76,13 +85,13 @@ export function ReviewPage({ reviewId, onBack }: Props) {
 
       <p className="progress">
         <strong>
-          {decided} of {review.risk_flags.length} flags decided
+          {decisions.length} of {review.risk_flags.length} flags decided
         </strong>{' '}
         — every flag needs a reviewer decision before this review is complete.
       </p>
 
       <aside className="guard">
-        <h3>Citation guard</h3>
+        <h4>Citation guard</h4>
         {notes.length === 0 ? (
           <p>Every citation and tool finding the agent used was verified against this run.</p>
         ) : (

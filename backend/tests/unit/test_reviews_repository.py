@@ -96,3 +96,97 @@ def test_decision_for_unknown_review_or_flag_is_rejected(tmp_path: Path):
         repo.save_decision(FlagDecision(review_id="rev_1", flag_id="NOPE", decision="accepted"))
     with pytest.raises(UnknownFlagError):
         repo.save_decision(FlagDecision(review_id="rev_x", flag_id="TX-1", decision="accepted"))
+
+
+def test_review_lifecycle_queued_running_done(tmp_path: Path):
+    repo = ReviewRepository(tmp_path / "r.db")
+
+    repo.create_pending("rev_9", "acme-2025")
+    rec = repo.get_record("rev_9")
+    assert rec is not None and rec.status == "queued" and rec.result is None
+
+    repo.mark_running("rev_9")
+    assert repo.get_record("rev_9").status == "running"  # type: ignore[union-attr]
+
+    repo.save(_result("rev_9"))
+    rec = repo.get_record("rev_9")
+    assert rec.status == "done" and rec.result is not None and rec.error is None  # type: ignore[union-attr]
+    assert repo.list_for_engagement("acme-2025")[0].status == "done"
+
+
+def test_review_lifecycle_failed_keeps_error_and_no_result(tmp_path: Path):
+    repo = ReviewRepository(tmp_path / "r.db")
+    repo.create_pending("rev_9", "acme-2025")
+    repo.mark_failed("rev_9", "AgentRunError: max_turns")
+    rec = repo.get_record("rev_9")
+    assert rec.status == "failed" and rec.error == "AgentRunError: max_turns"  # type: ignore[union-attr]
+    assert repo.get("rev_9") is None  # no result to return
+    summary = repo.list_for_engagement("acme-2025")[0]
+    assert summary.status == "failed" and summary.flag_count == 0
+
+
+def test_pending_review_is_listed_with_queued_status(tmp_path: Path):
+    repo = ReviewRepository(tmp_path / "r.db")
+    repo.create_pending("rev_q", "acme-2025")
+    [summary] = repo.list_for_engagement("acme-2025")
+    assert summary.status == "queued" and summary.overall_risk_level is None
+
+
+def test_opening_a_pre_status_database_rebuilds_the_table_and_keeps_rows(tmp_path: Path):
+    import sqlite3
+
+    db = tmp_path / "old.db"
+    with sqlite3.connect(db) as conn:  # the Milestone 3 schema: NOT NULL everywhere, no status
+        conn.executescript(
+            """
+            CREATE TABLE reviews (
+                review_id TEXT PRIMARY KEY, engagement_id TEXT NOT NULL, created_at TEXT NOT NULL,
+                overall_risk_level TEXT NOT NULL, flag_count INTEGER NOT NULL, model TEXT NOT NULL,
+                result_json TEXT NOT NULL
+            );
+            CREATE TABLE flag_decisions (
+                review_id TEXT NOT NULL, flag_id TEXT NOT NULL, decision TEXT NOT NULL,
+                reviewer_note TEXT NOT NULL DEFAULT '', decided_at TEXT NOT NULL,
+                PRIMARY KEY (review_id, flag_id)
+            );
+            """
+        )
+        conn.execute(
+            "INSERT INTO reviews VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                "rev_old",
+                "acme-2025",
+                "2026-09-11T10:00:00+00:00",
+                "high",
+                1,
+                "gpt-4.1-mini",
+                _result("rev_old").model_dump_json(),
+            ),
+        )
+
+    repo = ReviewRepository(db)
+
+    old = repo.get_record("rev_old")
+    assert old is not None and old.status == "done" and old.result is not None
+    repo.create_pending("rev_new", "acme-2025")  # would violate the old NOT NULL constraints
+    assert repo.get_record("rev_new").status == "queued"  # type: ignore[union-attr]
+    assert ReviewRepository(db).get_record("rev_new") is not None  # migration is idempotent
+
+
+def test_intermediate_schema_with_status_but_not_null_result_columns_is_rebuilt(tmp_path: Path):
+    import sqlite3
+
+    db = tmp_path / "mid.db"
+    with sqlite3.connect(db) as conn:
+        conn.executescript(
+            """
+            CREATE TABLE reviews (
+                review_id TEXT PRIMARY KEY, engagement_id TEXT NOT NULL, created_at TEXT NOT NULL,
+                overall_risk_level TEXT NOT NULL, flag_count INTEGER NOT NULL, model TEXT NOT NULL,
+                result_json TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'done', error TEXT
+            );
+            """
+        )
+    repo = ReviewRepository(db)
+    repo.create_pending("rev_new", "acme-2025")
+    assert repo.get_record("rev_new").status == "queued"  # type: ignore[union-attr]

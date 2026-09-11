@@ -1,13 +1,12 @@
+from pathlib import Path
+
 import pytest
 from fastapi.testclient import TestClient
 
-from app.agent.foundry_agent import AgentRunError
 from app.api.dependencies import get_review_service
-from app.db.reviews import ReviewSummary
+from app.db.reviews import ReviewRepository
 from app.main import create_app
-from app.models.review import CitationGuardReport, ReviewResult
-from app.services.engagement_data import EngagementNotFoundError
-from app.services.review_service import ReviewParseError
+from app.models.review import CitationGuardReport, ReviewResult, RiskFlag
 
 
 def _result(review_id: str = "rev_abc") -> ReviewResult:
@@ -20,142 +19,97 @@ def _result(review_id: str = "rev_abc") -> ReviewResult:
         citation_guard=CitationGuardReport(),
         overall_summary="s",
         overall_risk_level="high",
-        risk_flags=[],
+        risk_flags=[
+            RiskFlag(
+                id="TX-1",
+                title="t",
+                state="TX",
+                category="physical_presence",
+                risk_level="high",
+                explanation="e",
+                retrieved_evidence=[],
+                tool_findings=[],
+                recommended_human_action="a",
+            )
+        ],
         states_reviewed_without_flags=[],
     )
 
 
-class _FakeService:
-    def __init__(self) -> None:
-        self.saved = {"rev_abc": _result()}
-        self.fail_with: Exception | None = None
+class _RepoBackedService:
+    """Reads/decisions go to a real repository; nothing here calls Azure."""
 
-    def run_review(self, engagement_id: str) -> ReviewResult:
-        if self.fail_with:
-            raise self.fail_with
-        if engagement_id != "acme-2025":
-            raise EngagementNotFoundError(engagement_id)
-        return self.saved["rev_abc"]
+    def __init__(self, repo: ReviewRepository) -> None:
+        self.repo = repo
 
-    def get_review(self, review_id: str) -> ReviewResult | None:
-        return self.saved.get(review_id)
+    def get_record(self, review_id: str):
+        return self.repo.get_record(review_id)
+
+    def list_reviews(self, engagement_id: str):
+        return self.repo.list_for_engagement(engagement_id)
 
     def list_decisions(self, review_id: str):
-        return [d for d in getattr(self, "decisions", []) if d.review_id == review_id]
+        return self.repo.list_decisions(review_id)
 
     def decide_flag(self, decision):
-        from app.db.reviews import UnknownFlagError
-
-        if decision.flag_id != "TX-1":
-            raise UnknownFlagError(decision.flag_id)
-        self.decisions = [decision]
+        self.repo.save_decision(decision)
         return decision
-
-    def list_engagements(self):
-        from app.services.engagement_data import EngagementDataRepository
-        from app.services.review_service import EngagementSummary
-        from tests.conftest import SYNTHETIC_ROOT
-
-        repo = EngagementDataRepository(SYNTHETIC_ROOT)
-        data = repo.load("acme-2025")
-        return [
-            EngagementSummary(
-                engagement_id="acme-2025",
-                company_name=data.company_name,
-                home_state=data.home_state,
-                tax_year=data.tax_year,
-                documents=[p.name for p in repo.document_paths("acme-2025")],
-            )
-        ]
-
-    def list_reviews(self, engagement_id: str) -> list[ReviewSummary]:
-        return [
-            ReviewSummary(
-                review_id=r.review_id,
-                engagement_id=r.engagement_id,
-                created_at=r.created_at,
-                overall_risk_level=r.overall_risk_level,
-                flag_count=len(r.risk_flags),
-                model=r.model,
-            )
-            for r in self.saved.values()
-            if r.engagement_id == engagement_id
-        ]
 
 
 @pytest.fixture
-def api() -> tuple[TestClient, _FakeService]:
+def api(tmp_path: Path):
+    repo = ReviewRepository(tmp_path / "r.db")
+    repo.save(_result("rev_abc"))
+    repo.create_pending("rev_queued", "acme-2025")
+    repo.create_pending("rev_bad", "acme-2025")
+    repo.mark_failed("rev_bad", "AgentRunError: max_turns")
     app = create_app()
-    fake = _FakeService()
-    app.dependency_overrides[get_review_service] = lambda: fake
-    return TestClient(app), fake
+    app.dependency_overrides[get_review_service] = lambda: _RepoBackedService(repo)
+    return TestClient(app)
 
 
-def test_post_review_returns_result_with_disclaimer(api):
-    client, _ = api
-    response = client.post("/api/engagements/acme-2025/reviews")
-    assert response.status_code == 201
-    body = response.json()
-    assert body["review_id"] == "rev_abc"
-    assert body["human_review_required"] is True
-    assert "not tax advice" in body["disclaimer"].lower()
+def test_get_done_review_includes_result_and_disclaimer(api: TestClient):
+    body = api.get("/api/reviews/rev_abc").json()
+    assert body["status"] == "done" and body["error"] is None
+    assert body["review"]["review_id"] == "rev_abc"
+    assert body["review"]["human_review_required"] is True
+    assert "not tax advice" in body["review"]["disclaimer"].lower()
+    assert body["decisions"] == []
 
 
-def test_post_review_unknown_engagement_is_404(api):
-    client, _ = api
-    assert client.post("/api/engagements/nope-2025/reviews").status_code == 404
-
-
-def test_post_review_agent_failure_is_502_with_reason(api):
-    client, fake = api
-    fake.fail_with = AgentRunError("agent response r1 failed")
-    response = client.post("/api/engagements/acme-2025/reviews")
-    assert response.status_code == 502
-    assert "failed" in response.json()["detail"]
-
-    fake.fail_with = ReviewParseError("bad json")
-    assert client.post("/api/engagements/acme-2025/reviews").status_code == 502
-
-
-def test_get_review_and_list(api):
-    client, _ = api
-    assert client.get("/api/reviews/rev_abc").json()["review"]["engagement_id"] == "acme-2025"
-    assert client.get("/api/reviews/missing").status_code == 404
-    listed = client.get("/api/engagements/acme-2025/reviews").json()
-    assert [r["review_id"] for r in listed] == ["rev_abc"]
-
-
-def test_invalid_engagement_id_shape_is_rejected_by_validation(api):
-    client, _ = api
-    assert client.post("/api/engagements/..%2Fetc/reviews").status_code in (404, 422)
-
-
-def test_list_engagements_returns_the_synthetic_engagement(api):
-    client, _ = api
-    body = client.get("/api/engagements").json()
-    acme = next(e for e in body if e["engagement_id"] == "acme-2025")
-    assert acme["company_name"] == "Acme Widgets LLC" and acme["tax_year"] == 2025
-    assert sorted(acme["documents"]) == ["locations.docx", "questionnaire.pdf"]
-
-
-def test_get_review_includes_decisions_and_patch_records_one(api):
-    client, fake = api
-    assert client.get("/api/reviews/rev_abc").json()["decisions"] == []
-
-    response = client.patch(
-        "/api/reviews/rev_abc/flags/TX-1",
-        json={"decision": "accepted", "reviewer_note": "confirmed"},
-    )
-
-    assert response.status_code == 200
-    assert response.json()["decision"] == "accepted"
-    detail = client.get("/api/reviews/rev_abc").json()
-    assert detail["decisions"][0]["flag_id"] == "TX-1"
+def test_get_queued_and_failed_reviews_expose_status_without_result(api: TestClient):
+    queued = api.get("/api/reviews/rev_queued").json()
+    assert queued["status"] == "queued" and queued["review"] is None
+    failed = api.get("/api/reviews/rev_bad").json()
     assert (
-        client.patch("/api/reviews/rev_abc/flags/TX-1", json={"decision": "maybe"}).status_code
-        == 422
+        failed["status"] == "failed" and "max_turns" in failed["error"] and failed["review"] is None
+    )
+    assert api.get("/api/reviews/missing").status_code == 404
+
+
+def test_list_reviews_with_status(api: TestClient):
+    listed = api.get("/api/engagements/acme-2025/reviews").json()
+    assert {r["review_id"]: r["status"] for r in listed} == {
+        "rev_abc": "done",
+        "rev_queued": "queued",
+        "rev_bad": "failed",
+    }
+
+
+def test_patch_decision_round_trip_and_validation(api: TestClient):
+    r = api.patch(
+        "/api/reviews/rev_abc/flags/TX-1", json={"decision": "accepted", "reviewer_note": "ok"}
+    )
+    assert r.status_code == 200 and r.json()["decision"] == "accepted"
+    assert api.get("/api/reviews/rev_abc").json()["decisions"][0]["flag_id"] == "TX-1"
+    assert (
+        api.patch("/api/reviews/rev_abc/flags/TX-1", json={"decision": "maybe"}).status_code == 422
     )
     assert (
-        client.patch("/api/reviews/rev_abc/flags/NOPE", json={"decision": "rejected"}).status_code
+        api.patch("/api/reviews/rev_abc/flags/NOPE", json={"decision": "rejected"}).status_code
+        == 404
+    )
+    assert (
+        api.patch("/api/reviews/rev_queued/flags/TX-1", json={"decision": "rejected"}).status_code
         == 404
     )

@@ -162,16 +162,33 @@ decisions), `PATCH /api/reviews/{review_id}/flags/{flag_id}` (reviewer decision)
 
 ## The review UI (Milestone 4)
 
-Two pages, plain React + CSS, hash routing, no UI library:
+The UI follows the real workflow: **Create engagement → Upload & process → Ask agent → Run review →
+Evidence & findings**. Plain React + CSS, hash routing (`#/e/<engagement_id>/<step>`), no UI library.
 
-- **Engagements** (`#/`) — company, home state, indexed documents, past reviews, and **Run review**
-  (synchronous; the page shows progress for the 30–90 s the agent takes, then opens the result).
-- **Review** (`#/reviews/<id>`) — overall summary and risk level, the citation-guard notes, and one
-  card per flag. Each card keeps the three kinds of information in separate, colour-coded regions —
-  **Retrieved evidence** (source, page, `chunk_id`, verbatim quote), **Computed from client data**
-  (tool name + figure) and **AI analysis** — followed by the recommended human action and the
-  reviewer's decision (**Accept / Reject / Needs more info** + note), persisted via
-  `PATCH /api/reviews/{id}/flags/{flag_id}`. A counter shows how many flags still need a decision.
+- **Home** — create an engagement (company, home state, tax year → SQLite + `data/uploads/<id>/`),
+  list engagements with document/review status, and index the shared reference guidance.
+- **1 · Upload & process** — upload files one at a time: PDF/DOCX are indexed as citable evidence
+  (document type inferred from the name or chosen explicitly); a CSV is the sales export, validated
+  on arrival and stored as `sales.csv`. **Process documents** runs Document Intelligence → chunking →
+  embeddings → AI Search in a FastAPI `BackgroundTask`; each file shows
+  `uploaded → processing → indexed | failed` (with the error) and the page polls until done.
+  **Load synthetic demo** pushes the Acme fixtures through the *same* upload/processing path.
+- **2 · Ask agent** — placeholder for the grounded Q&A step (next section); enabled by `can_ask`.
+- **3 · Run review** — enabled by the backend's `can_review` (≥1 indexed document); queues the
+  agent (`queued → running → done | failed`), lists past reviews with status.
+- **4 · Evidence & findings** — summary, citation-guard notes, one card per flag with **Retrieved
+  evidence / Computed from client data / AI analysis** kept separate, and the reviewer's decision
+  (accept / reject / needs more info) persisted per flag.
+
+Readiness is computed by the backend and returned with every engagement; the UI never guesses.
+Structured JSON (questionnaire/locations) is internal fixture data loaded only by the demo button;
+the deterministic tools tolerate a missing sales/questionnaire/locations file and say so.
+
+Endpoints: `GET|POST /api/engagements`, `GET /api/engagements/{id}`,
+`POST /api/engagements/{id}/documents` (multipart), `POST …/documents/process` (202),
+`POST …/demo-files` (202), `GET /api/reference`, `POST /api/reference/index` (202),
+`POST /api/engagements/{id}/reviews` (202, 409 if not ready), `GET /api/engagements/{id}/reviews`,
+`GET /api/reviews/{id}` (status + result + decisions), `PATCH /api/reviews/{id}/flags/{flag_id}`.
 
 Run the backend (below), then `cd frontend && npm run dev` and open http://localhost:5173.
 
@@ -226,7 +243,7 @@ Azure SDK clients are wrapped once in `backend/app/azure/` (`credential.py`, `do
    - Stage 1 ✅ Azure resources provisioned; keyless SDK wrappers; connectivity check (`scripts/check_azure.py`, `/api/health/azure`)
    - Stage 2 ✅ synthetic data generator, page-aware chunking, `fd-evidence` index, ingestion pipeline, `search_evidence` tool
 3. **Agent loop** — deterministic tools, Foundry agent + tool dispatch, `ReviewResult` schema, citation guard, SQLite, review API ✅
-4. **Review UI** — engagements, run review, flag cards with evidence separated from analysis, human decisions ✅
+4. **Review UI** — create → upload/process (background) → ask → run review (background) → findings with decisions ✅ (ask step: next)
 5. **Observability** — OpenTelemetry traces into Foundry
 6. **Evaluation** — golden set, groundedness/relevance, flag recall, citation validity
 7. **Polish** — docs, demo script

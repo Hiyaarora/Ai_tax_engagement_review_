@@ -14,6 +14,7 @@ dependencies = [
     "azure-search-documents>=12.0.0",
     "azure-ai-projects>=2.6.0",
     "openai>=3.13.0",
+    "python-multipart>=0.0.32",
 ]
 
 [dependency-groups]

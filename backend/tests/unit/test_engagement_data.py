@@ -89,3 +89,27 @@ def test_document_paths_only_lists_indexable_files_in_the_engagement_dir(tmp_pat
     (d / "locations.docx").write_bytes(b"PK")
     docs = EngagementDataRepository(tmp_path).document_paths("acme-2025")
     assert [p.name for p in docs] == ["locations.docx", "questionnaire.pdf"]
+
+
+def test_missing_structured_files_load_as_empty_not_error(tmp_path: Path):
+    d = tmp_path / "engagements" / "solo-2025"
+    d.mkdir(parents=True)
+    (d / "engagement.json").write_text(
+        json.dumps(
+            {
+                "engagement_id": "solo-2025",
+                "company_name": "S",
+                "home_state": "TX",
+                "tax_year": 2025,
+            }
+        )
+    )
+    data = EngagementDataRepository(tmp_path).load("solo-2025")
+    assert data.transactions == [] and data.questionnaire == [] and data.locations == []
+
+
+def test_write_metadata_creates_the_engagement_directory_and_json(tmp_path: Path):
+    repo = EngagementDataRepository(tmp_path)
+    repo.write_metadata("new-2025", company_name="N", home_state="WA", tax_year=2025)
+    assert repo.load("new-2025").company_name == "N"
+    assert repo.directory("new-2025") == (tmp_path / "engagements" / "new-2025").resolve()
