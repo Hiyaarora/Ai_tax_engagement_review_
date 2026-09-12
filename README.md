@@ -229,7 +229,6 @@ backend/
   scripts/           Setup, ingestion, review and evaluation commands
 frontend/            React application
 data/synthetic/      Synthetic sample engagement (committed); uploads and the database are ignored
-docs/                Architecture notes and a demo walkthrough
 ```
 
 ## Limitations
