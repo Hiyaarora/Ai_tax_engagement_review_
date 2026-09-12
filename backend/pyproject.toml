@@ -15,6 +15,9 @@ dependencies = [
     "azure-ai-projects>=2.6.0",
     "openai>=3.13.0",
     "python-multipart>=0.0.32",
+    "opentelemetry-api>=1.44.0",
+    "opentelemetry-sdk>=1.44.0",
+    "azure-monitor-opentelemetry>=1.8.10",
 ]
 
 [dependency-groups]

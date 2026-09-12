@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.azure.embeddings import EmbeddingService
 from app.azure.search import SearchService
 from app.models.evidence import DocType, EvidenceHit
+from app.observability.tracing import span
 
 
 class SearchEvidenceArgs(BaseModel):
@@ -41,11 +42,23 @@ class SearchEvidenceTool:
         self._search = search
 
     def run(self, args: SearchEvidenceArgs, *, engagement_id: str) -> list[EvidenceHit]:
-        [query_vector] = self._embeddings.embed([args.query])
-        return self._search.hybrid_search(
-            args.query,
-            query_vector,
+        with span(
+            "search.hybrid",
             engagement_id=engagement_id,
-            doc_types=args.doc_types,
             top_k=args.top_k,
-        )
+            doc_types=",".join(args.doc_types) if args.doc_types else None,
+        ) as current:
+            with span("embed", count=1):
+                [query_vector] = self._embeddings.embed([args.query])
+            with span("search.query", engagement_id=engagement_id):
+                hits = self._search.hybrid_search(
+                    args.query,
+                    query_vector,
+                    engagement_id=engagement_id,
+                    doc_types=args.doc_types,
+                    top_k=args.top_k,
+                )
+            current.set_attribute("hits", len(hits))
+            if hits:
+                current.set_attribute("top_score", hits[0].score)
+            return hits

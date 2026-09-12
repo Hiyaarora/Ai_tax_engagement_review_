@@ -10,6 +10,8 @@ reviews remain the record. Decision support only - not tax advice.
 
 from __future__ import annotations
 
+import time
+
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from app.agent.citation_guard import guard_citations, guard_tool_findings
@@ -17,7 +19,14 @@ from app.agent.review_context import ReviewContext
 from app.agent.tool_registry import build_registry
 from app.azure.chat import ChatService
 from app.models.evidence import EvidenceHit
-from app.models.review import Citation, CitationGuardReport, ToolFinding, strict_json_schema
+from app.models.review import (
+    Citation,
+    CitationGuardReport,
+    TokenUsage,
+    ToolFinding,
+    strict_json_schema,
+)
+from app.observability.tracing import span
 from app.services.engagement_data import SALES_FILE, EngagementDataRepository
 from app.tools.search_evidence import SearchEvidenceArgs, SearchEvidenceTool
 
@@ -91,6 +100,7 @@ class AskResult(BaseModel):
     tool_calls: list[str] = Field(default_factory=list)
     passages: list[EvidenceHit]
     citation_guard: CitationGuardReport
+    usage: TokenUsage = Field(default_factory=TokenUsage)
     model: str
     disclaimer: str = (
         "Decision support only - not tax advice. Answer generated from SYNTHETIC documents and "
@@ -133,6 +143,17 @@ class AskService:
         question = question.strip()
         if not question:
             raise ValueError("question is empty")
+        started = time.perf_counter()
+        with span("ask.answer", engagement_id=engagement_id) as current:
+            result = self._ask(engagement_id, question, ctx_started=started)
+            current.set_attribute("citations", len(result.citations))
+            current.set_attribute("structured_evidence", len(result.structured_evidence))
+            current.set_attribute("found", result.found_in_documents)
+            current.set_attribute("input_tokens", result.usage.input_tokens)
+            current.set_attribute("output_tokens", result.usage.output_tokens)
+            return result
+
+    def _ask(self, engagement_id: str, question: str, *, ctx_started: float) -> AskResult:
         data = self._engagements.load(engagement_id)  # raises EngagementNotFoundError
         ctx = ReviewContext(engagement_id=engagement_id, data=data)
 
@@ -146,7 +167,7 @@ class AskService:
             f"tax year {data.tax_year}.\n\nQuestion: {question}\n\nPassages:\n\n"
             f"{_render_passages(hits)}"
         )
-        raw = self._chat.complete_json(
+        completion = self._chat.complete_json(
             system=SYSTEM_PROMPT,
             user=user,
             schema_name="ask_draft",
@@ -154,6 +175,7 @@ class AskService:
             tools=self._tool_definitions,
             dispatch=lambda name, args: self._registry.dispatch(name, args, ctx),
         )
+        raw = completion.text if hasattr(completion, "text") else str(completion)
         try:
             draft = AskDraft.model_validate_json(raw)
         except ValidationError as exc:
@@ -189,5 +211,12 @@ class AskService:
             tool_calls=list(ctx.tool_calls),
             passages=hits,
             citation_guard=report,
+            usage=TokenUsage(
+                input_tokens=getattr(completion, "input_tokens", 0),
+                output_tokens=getattr(completion, "output_tokens", 0),
+                turns=getattr(completion, "turns", 0),
+                duration_ms=int((time.perf_counter() - ctx_started) * 1000),
+                tool_durations_ms=ctx.tool_durations_ms(),
+            ),
             model=self._chat.deployment,
         )

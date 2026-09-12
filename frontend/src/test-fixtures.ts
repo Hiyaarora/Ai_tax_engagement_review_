@@ -63,6 +63,13 @@ export const doneReview: ReviewDetail = {
       dropped_tool_findings: [],
       flags_without_evidence: [],
     },
+    usage: {
+      input_tokens: 1200,
+      output_tokens: 340,
+      turns: 3,
+      duration_ms: 44000,
+      tool_durations_ms: { analyze_sales_by_state: 12, search_evidence: 2100 },
+    },
     human_review_required: true,
     disclaimer: 'Decision support only - not tax advice.',
     overall_summary: 'Texas and Washington need attention.',

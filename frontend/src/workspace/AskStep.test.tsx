@@ -48,6 +48,7 @@ const answer: AskResult = {
     dropped_tool_findings: [],
     flags_without_evidence: [],
   },
+  usage: { input_tokens: 900, output_tokens: 120, turns: 2, duration_ms: 5200, tool_durations_ms: {} },
   model: 'gpt-4.1-mini',
   disclaimer: 'Decision support only - not tax advice.',
 }

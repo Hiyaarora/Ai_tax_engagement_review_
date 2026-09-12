@@ -30,7 +30,7 @@ def test_complete_json_sends_system_user_and_strict_schema():
         schema={"type": "object", "properties": {"answer": {"type": "string"}}},
     )
 
-    assert text == '{"answer": "yes"}'
+    assert text.text == '{"answer": "yes"}'
     call = client.responses.calls[0]
     assert call["model"] == "gpt-4.1-mini"
     assert call["instructions"] == "You are careful."
@@ -93,7 +93,7 @@ def test_complete_json_with_tools_dispatches_function_calls_then_returns_final_j
         dispatch=lambda name, args: dispatched.append((name, args)) or '{"states": []}',
     )
 
-    assert text == '{"answer": "TX 620k"}'
+    assert text.text == '{"answer": "TX 620k"}'
     assert dispatched == [("analyze_sales_by_state", "{}")]
     first, second = client.responses.calls
     assert first["tools"] == tools and first["text"]["format"]["name"] == "ask_draft"

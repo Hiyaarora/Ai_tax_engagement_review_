@@ -196,6 +196,35 @@ Endpoints: `GET|POST /api/engagements`, `GET /api/engagements/{id}`,
 
 Run the backend (below), then `cd frontend && npm run dev` and open http://localhost:5173.
 
+## Observability (Milestone 5)
+
+Every pipeline stage is an OpenTelemetry span (`backend/app/observability/tracing.py`); attributes
+carry ids and counts only - never document text, answers or secrets. Logs carry the active
+`trace=`/`span=` ids so a log line and a trace can be found from each other.
+
+| Span | Where | Key attributes |
+|---|---|---|
+| `ingest.document` → `di.analyze_layout`, `chunk`, `embed`, `search.delete_stale`, `search.upsert` | ingestion | `engagement_id`, `doc_id`, `doc_type`, `pages`, `chunks`, `count` |
+| `search.hybrid` → `embed`, `search.query` | `search_evidence` tool (reviews and questions) | `top_k`, `doc_types`, `hits`, `top_score` |
+| `review.run` → `agent.turn`×N, `tool.<name>`, `citation_guard` | review agent | `review_id`, `flags`, `tool_calls`, `turns`, `input_tokens`, `output_tokens`; per turn `response_id`, `tool_calls`; per tool `ok`, `output_bytes` |
+| `ask.answer` → `search.hybrid`, `chat.complete` → `tool.<name>` | ask agent | `citations`, `structured_evidence`, `found`, tokens; `chat.complete` has `model`, `turns`, tokens |
+
+Token and latency accounting is persisted with each review (`usage`: input/output tokens, turns,
+wall time, per-tool time) and returned with each answer; the UI shows it as one line under the
+findings header and under each answer.
+
+**Where traces go** (settings in `.env.example`):
+
+| Mode | When | What you get |
+|---|---|---|
+| Application Insights → Foundry **Tracing** tab | `APPLICATIONINSIGHTS_CONNECTION_STRING` set, or `OTEL_USE_FOUNDRY_APP_INSIGHTS=true` and an Application Insights resource attached to the Foundry project (portal → project → *Tracing* → connect/create) | end-to-end traces per review/question next to the agent in Foundry; FastAPI/HTTP spans are added automatically by the Azure Monitor distro |
+| Console | `OTEL_CONSOLE_EXPORT=true` | spans printed to stdout while developing |
+| Local (default) | nothing set | spans created but not exported; zero configuration, nothing breaks |
+
+A representative trace from a real run (synthetic Acme engagement): Document Intelligence 4-10 s
+per document, embeddings ~3 s per batch, each AI Search call ~1.5 s (first call includes token
+acquisition), the model ~6.6 s for a two-turn grounded answer, the sales tool 4 ms.
+
 ## Run the backend
 
 ```bash
@@ -248,6 +277,6 @@ Azure SDK clients are wrapped once in `backend/app/azure/` (`credential.py`, `do
    - Stage 2 ✅ synthetic data generator, page-aware chunking, `fd-evidence` index, ingestion pipeline, `search_evidence` tool
 3. **Agent loop** — deterministic tools, Foundry agent + tool dispatch, `ReviewResult` schema, citation guard, SQLite, review API ✅
 4. **Review UI** — create → upload/process (background) → ask (grounded Q&A) → run review (background) → findings with decisions ✅
-5. **Observability** — OpenTelemetry traces into Foundry
+5. **Observability** — OpenTelemetry spans per stage, log/trace correlation, token + latency accounting in the UI, Application Insights → Foundry Tracing ✅
 6. **Evaluation** — golden set, groundedness/relevance, flag recall, citation validity
 7. **Polish** — docs, demo script

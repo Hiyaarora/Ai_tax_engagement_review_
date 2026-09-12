@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { api } from '../api/client'
+import { UsageLine } from '../components/UsageLine'
 import type { AskResult, CitationGuardReport, EngagementDetail } from '../types'
 
 interface Props {
@@ -173,8 +174,9 @@ export function AskStep({ detail }: Props) {
 
             <p className="muted small">
               {notes.length ? `Citation guard: ${notes.join('; ')}.` : 'Citation guard: all citations verified.'}{' '}
-              · {r.model} · {r.disclaimer}
+              · {r.disclaimer}
             </p>
+            <UsageLine usage={r.usage} model={r.model} />
           </article>
         )
       })}

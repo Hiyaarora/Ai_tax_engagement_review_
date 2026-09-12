@@ -50,6 +50,15 @@ export interface RiskFlag {
   recommended_human_action: string
 }
 
+/** Cost and latency of one agent/model run. */
+export interface TokenUsage {
+  input_tokens: number
+  output_tokens: number
+  turns: number
+  duration_ms: number
+  tool_durations_ms: Record<string, number>
+}
+
 export interface CitationGuardReport {
   dropped_citations: string[]
   corrected_citations: string[]
@@ -66,6 +75,7 @@ export interface ReviewResult {
   agent_name: string
   tool_calls: string[]
   citation_guard: CitationGuardReport
+  usage: TokenUsage
   human_review_required: true
   disclaimer: string
   overall_summary: string
@@ -175,6 +185,7 @@ export interface AskResult {
   tool_calls: string[]
   passages: EvidenceHit[]
   citation_guard: CitationGuardReport
+  usage: TokenUsage
   model: string
   disclaimer: string
 }

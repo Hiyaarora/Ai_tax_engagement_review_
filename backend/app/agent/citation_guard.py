@@ -26,6 +26,7 @@ from app.models.review import (
     ToolFinding,
     UnverifiedQuote,
 )
+from app.observability.tracing import span
 
 
 def _normalise(text: str) -> str:
@@ -84,5 +85,10 @@ def apply_citation_guard(
     draft: ReviewDraft, ctx: ReviewContext
 ) -> tuple[ReviewDraft, CitationGuardReport]:
     report = CitationGuardReport()
-    flags = [_guard_flag(flag, ctx, report) for flag in draft.risk_flags]
+    with span("citation_guard", engagement_id=ctx.engagement_id, flags=len(draft.risk_flags)) as s:
+        flags = [_guard_flag(flag, ctx, report) for flag in draft.risk_flags]
+        s.set_attribute("dropped_citations", len(report.dropped_citations))
+        s.set_attribute("unverified_quotes", len(report.unverified_quotes))
+        s.set_attribute("dropped_tool_findings", len(report.dropped_tool_findings))
+        s.set_attribute("flags_without_evidence", len(report.flags_without_evidence))
     return draft.model_copy(update={"risk_flags": flags}), report

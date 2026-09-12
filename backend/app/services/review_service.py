@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 import re
 import secrets
+import time
 
 from pydantic import ValidationError
 
@@ -19,7 +20,8 @@ from app.agent.prompts import build_review_prompt
 from app.agent.review_context import ReviewContext
 from app.agent.tool_registry import ToolRegistry
 from app.db.reviews import FlagDecision, ReviewRecord, ReviewRepository, ReviewSummary
-from app.models.review import ReviewDraft, ReviewResult
+from app.models.review import ReviewDraft, ReviewResult, TokenUsage
+from app.observability.tracing import span
 from app.services.engagement_data import EngagementDataRepository
 
 log = logging.getLogger(__name__)
@@ -91,25 +93,40 @@ class ReviewService:
         return result
 
     def _run(self, engagement_id: str, review_id: str) -> ReviewResult:
-        data = self._engagements.load(engagement_id)
-        ctx = ReviewContext(engagement_id=engagement_id, data=data)
-        document_names = [p.name for p in self._engagements.document_paths(engagement_id)]
+        started = time.perf_counter()
+        with span("review.run", engagement_id=engagement_id, review_id=review_id) as current:
+            data = self._engagements.load(engagement_id)
+            ctx = ReviewContext(engagement_id=engagement_id, data=data)
+            document_names = [p.name for p in self._engagements.document_paths(engagement_id)]
 
-        outcome = self._runner.run(
-            build_review_prompt(data, document_names),
-            dispatch=lambda name, args: self._registry.dispatch(name, args, ctx),
-        )
-        draft = parse_draft(outcome.output_text)
-        guarded, report = apply_citation_guard(draft, ctx)
-        return ReviewResult(
-            **guarded.model_dump(),
-            review_id=review_id,
-            engagement_id=engagement_id,
-            model=outcome.model,
-            agent_name=self._runner.agent_name,
-            tool_calls=list(ctx.tool_calls),
-            citation_guard=report,
-        )
+            outcome = self._runner.run(
+                build_review_prompt(data, document_names),
+                dispatch=lambda name, args: self._registry.dispatch(name, args, ctx),
+            )
+            draft = parse_draft(outcome.output_text)
+            guarded, report = apply_citation_guard(draft, ctx)
+            usage = TokenUsage(
+                input_tokens=outcome.input_tokens,
+                output_tokens=outcome.output_tokens,
+                turns=outcome.turns,
+                duration_ms=int((time.perf_counter() - started) * 1000),
+                tool_durations_ms=ctx.tool_durations_ms(),
+            )
+            current.set_attribute("flags", len(guarded.risk_flags))
+            current.set_attribute("tool_calls", len(ctx.tool_calls))
+            current.set_attribute("input_tokens", usage.input_tokens)
+            current.set_attribute("output_tokens", usage.output_tokens)
+            current.set_attribute("turns", usage.turns)
+            return ReviewResult(
+                **guarded.model_dump(),
+                review_id=review_id,
+                engagement_id=engagement_id,
+                model=outcome.model,
+                agent_name=self._runner.agent_name,
+                tool_calls=list(ctx.tool_calls),
+                citation_guard=report,
+                usage=usage,
+            )
 
     # --- reads / decisions ----------------------------------------------------------------------
 

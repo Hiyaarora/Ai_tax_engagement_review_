@@ -1,10 +1,24 @@
+import os
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
-from app.config import Settings, get_settings
-from app.main import create_app
+# app.main builds the app (and configures tracing) at import time, so the telemetry switches must
+# be pinned before it is imported - never export or look up Application Insights from tests.
+os.environ["OTEL_USE_FOUNDRY_APP_INSIGHTS"] = "false"
+os.environ["APPLICATIONINSIGHTS_CONNECTION_STRING"] = ""
+os.environ["OTEL_CONSOLE_EXPORT"] = "false"
+
+from app.config import Settings, get_settings  # noqa: E402
+from app.main import create_app  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _fresh_settings():
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
 
 
 @pytest.fixture

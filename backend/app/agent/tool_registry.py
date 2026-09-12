@@ -10,6 +10,7 @@ Two guarantees:
 from __future__ import annotations
 
 import json
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -19,6 +20,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from app.agent.review_context import ReviewContext
 from app.models.evidence import EvidenceHit
 from app.models.review import strict_json_schema
+from app.observability.tracing import span
 from app.tools.employee_locations import get_employee_locations
 from app.tools.nexus_thresholds import check_economic_nexus_thresholds
 from app.tools.questionnaire import get_questionnaire_answers
@@ -76,17 +78,27 @@ class ToolRegistry:
 
     def dispatch(self, name: str, arguments_json: str, ctx: ReviewContext) -> str:
         """Run one tool call. Always returns JSON; errors go back to the model, never raise."""
+        with span(f"tool.{name}", engagement_id=ctx.engagement_id) as current:
+            started = time.perf_counter()
+            output, ok = self._dispatch(name, arguments_json, ctx)
+            elapsed_ms = int((time.perf_counter() - started) * 1000)
+            if ok:
+                ctx.tool_timings.append((name, elapsed_ms))
+            current.set_attribute("ok", ok)
+            current.set_attribute("output_bytes", len(output))
+            return output
+
+    def _dispatch(self, name: str, arguments_json: str, ctx: ReviewContext) -> tuple[str, bool]:
         spec = self._specs.get(name)
         if spec is None:
-            return json.dumps({"error": f"unknown tool {name!r}; available: {self.names}"})
+            return json.dumps({"error": f"unknown tool {name!r}; available: {self.names}"}), False
         try:
             args = spec.args_model.model_validate_json(arguments_json or "{}")
         except ValidationError as exc:
-            return json.dumps(
-                {"error": f"invalid arguments for {name}: {exc.errors()}"}, default=str
-            )
+            error = {"error": f"invalid arguments for {name}: {exc.errors()}"}
+            return json.dumps(error, default=str), False
         ctx.tool_calls.append(name)
-        return spec.handler(ctx, args).model_dump_json()
+        return spec.handler(ctx, args).model_dump_json(), True
 
 
 def build_registry(search_evidence: SearchEvidenceTool | None) -> ToolRegistry:

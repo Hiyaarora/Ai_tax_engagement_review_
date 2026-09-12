@@ -18,6 +18,13 @@ class ReviewContext:
     data: EngagementData
     retrieved: dict[str, EvidenceHit] = field(default_factory=dict)  # chunk_id -> hit
     tool_calls: list[str] = field(default_factory=list)
+    tool_timings: list[tuple[str, int]] = field(default_factory=list)  # (tool, ms)
+
+    def tool_durations_ms(self) -> dict[str, int]:
+        totals: dict[str, int] = {}
+        for name, ms in self.tool_timings:
+            totals[name] = totals.get(name, 0) + ms
+        return totals
 
     def record_hits(self, hits: list[EvidenceHit]) -> None:
         for hit in hits:

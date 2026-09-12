@@ -18,6 +18,7 @@ from openai import OpenAI
 
 from app.azure.credential import get_credential
 from app.config import Settings
+from app.observability.tracing import span
 
 Dispatch = Callable[[str, str], str]  # (tool name, arguments JSON) -> output JSON
 
@@ -56,22 +57,26 @@ class FoundryAgentRunner:
         outcome = AgentRunOutcome(output_text="", model="")
         previous_id: str | None = None
         pending: list[dict[str, Any]] = []
-        for _ in range(self.max_turns):
-            response: Any = (
-                self._client.responses.create(input=user_input, extra_body=self._agent_ref)
-                if previous_id is None
-                else self._client.responses.create(
-                    previous_response_id=previous_id,
-                    input=pending,  # type: ignore[arg-type]  # openai types omit tool outputs
-                    extra_body=self._agent_ref,
+        for turn in range(1, self.max_turns + 1):
+            with span("agent.turn", agent=self.agent_name, turn=turn) as current:
+                response: Any = (
+                    self._client.responses.create(input=user_input, extra_body=self._agent_ref)
+                    if previous_id is None
+                    else self._client.responses.create(
+                        previous_response_id=previous_id,
+                        input=pending,  # type: ignore[arg-type]  # openai types omit tool outputs
+                        extra_body=self._agent_ref,
+                    )
                 )
-            )
-            self._record(response, outcome)
-            if getattr(response, "status", "completed") in ("failed", "incomplete", "cancelled"):
-                raise AgentRunError(f"agent response {response.id} {response.status}")
-            calls = [
-                item for item in response.output if getattr(item, "type", "") == "function_call"
-            ]
+                self._record(response, outcome)
+                current.set_attribute("response_id", response.id)
+                status = getattr(response, "status", "completed")
+                if status in ("failed", "incomplete", "cancelled"):
+                    raise AgentRunError(f"agent response {response.id} {status}")
+                calls = [
+                    item for item in response.output if getattr(item, "type", "") == "function_call"
+                ]
+                current.set_attribute("tool_calls", len(calls))
             if not calls:
                 outcome.output_text = response.output_text or ""
                 if not outcome.output_text:

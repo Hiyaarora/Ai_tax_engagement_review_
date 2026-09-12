@@ -19,6 +19,11 @@ describe('FindingsView', () => {
     expect(screen.getByText(/CA, NY/)).toBeInTheDocument()
     expect(screen.getByText(/1 of 2 flags decided/)).toBeInTheDocument()
     expect(screen.getByText(/not a definitive tax determination/i)).toBeInTheDocument()
+    const cost = screen.getByText(/1,540 tokens/)
+    expect(cost).toHaveTextContent(/1,200 in/)
+    expect(cost).toHaveTextContent(/3 turns/)
+    expect(cost).toHaveTextContent(/44 s/)
+    expect(cost).toHaveTextContent(/search_evidence 2\.1 s/)
   })
 
   it('records a decision and updates the counter', async () => {

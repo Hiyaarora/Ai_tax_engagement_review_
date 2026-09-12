@@ -77,6 +77,16 @@ class UnverifiedQuote(BaseModel):
     quote: str
 
 
+class TokenUsage(BaseModel):
+    """Cost and latency of one agent/model run, for the UI and for evaluation later."""
+
+    input_tokens: int = 0
+    output_tokens: int = 0
+    turns: int = 0
+    duration_ms: int = 0
+    tool_durations_ms: dict[str, int] = Field(default_factory=dict)
+
+
 class CitationGuardReport(BaseModel):
     """What the backend changed in the agent's draft. Non-empty lists are worth a human's look."""
 
@@ -103,6 +113,7 @@ class ReviewResult(ReviewDraft):
     agent_name: str
     tool_calls: list[str] = Field(description="Tool names invoked during this review, in order.")
     citation_guard: CitationGuardReport
+    usage: TokenUsage = Field(default_factory=TokenUsage)
     human_review_required: Literal[True] = True
     disclaimer: str = DISCLAIMER
 

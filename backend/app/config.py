@@ -37,6 +37,15 @@ class Settings(BaseSettings):
     # --- Azure AI Document Intelligence (Milestone 2) ---
     azure_document_intelligence_endpoint: str = ""
 
+    # --- Observability (Milestone 5) ---
+    # Application Insights connection string (keep it in .env). Empty = try the Application
+    # Insights resource attached to the Foundry project, else trace locally without exporting.
+    applicationinsights_connection_string: str = ""
+    # When true and no connection string is set, ask the Foundry project for the Application
+    # Insights resource attached to it (one network call at startup).
+    otel_use_foundry_app_insights: bool = False
+    otel_console_export: bool = False
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def _split_origins(cls, value: object) -> object:

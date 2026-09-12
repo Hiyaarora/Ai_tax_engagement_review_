@@ -8,12 +8,16 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import engagements, health, reviews
 from app.config import get_settings
+from app.observability.logging import configure_logging
+from app.observability.tracing import configure_tracing
 
 API_PREFIX = "/api"
 
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    configure_logging()
+    configure_tracing(settings)
 
     app = FastAPI(
         title="F&D Tax Engagement Review Agent",

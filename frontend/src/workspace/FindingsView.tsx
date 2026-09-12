@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api } from '../api/client'
 import { RiskFlagCard } from '../components/RiskFlagCard'
 import { StatusBadge } from '../components/StatusBadge'
+import { UsageLine } from '../components/UsageLine'
 import { usePolling } from '../hooks/usePolling'
 import type { CitationGuardReport, Decision, FlagDecision, ReviewDetail } from '../types'
 
@@ -79,6 +80,7 @@ export function FindingsView({ reviewId, pollMs = 3000 }: Props) {
           {new Date(review.created_at).toLocaleString()} · {review.model} via {review.agent_name} ·
           tools: {review.tool_calls.join(', ')}
         </p>
+        <UsageLine usage={review.usage} />
       </header>
 
       <p className="summary">{review.overall_summary}</p>
