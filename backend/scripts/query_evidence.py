@@ -1,4 +1,4 @@
-"""Run the search_evidence tool from the command line (the Milestone 2 checkpoint).
+"""Run the search_evidence tool from the command line (retrieval check).
 
 Usage (from backend/):
   uv run python -m scripts.query_evidence "inventory in Texas"

@@ -30,11 +30,11 @@ class Settings(BaseSettings):
     foundry_chat_deployment: str = "gpt-4.1-mini"
     foundry_embedding_deployment: str = "text-embedding-3-small"
 
-    # --- Azure AI Search (Milestone 2) ---
+    # --- Azure AI Search ---
     azure_search_endpoint: str = ""
     azure_search_index_name: str = "fd-evidence"
 
-    # --- Azure AI Document Intelligence (Milestone 2) ---
+    # --- Azure AI Document Intelligence ---
     azure_document_intelligence_endpoint: str = ""
 
     # --- Client budgets: a stalled Azure call must fail fast, not hang a review for an hour ---
@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     openai_max_retries: int = 2
     azure_timeout_seconds: int = 60  # Document Intelligence / AI Search per-request read timeout
 
-    # --- Observability (Milestone 5) ---
+    # --- Observability ---
     # Application Insights connection string (keep it in .env). Empty = try the Application
     # Insights resource attached to the Foundry project, else trace locally without exporting.
     applicationinsights_connection_string: str = ""

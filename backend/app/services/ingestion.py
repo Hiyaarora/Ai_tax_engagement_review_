@@ -1,7 +1,7 @@
 """Ingestion pipeline: file -> Document Intelligence -> page-aware chunks -> embeddings -> Search.
 
 Only unstructured documents (PDF, DOCX) are indexed. CSVs are structured client data and are
-consumed by the deterministic tools instead (Milestone 3) - vectorising a transaction list would
+consumed by the deterministic tools instead - vectorising a transaction list would
 invite the model to "read" numbers it should be computing.
 """
 

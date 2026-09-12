@@ -24,7 +24,7 @@ def test_engagement_and_company_are_clearly_synthetic():
 def test_sales_totals_by_state_create_the_intended_flags():
     totals = sales_by_state(sales_transactions())
     thresholds = json.loads(THRESHOLDS.read_text())["states"]
-    # Designed outcomes for Milestone 3's deterministic tool:
+    # Designed outcomes for the deterministic threshold tool:
     assert totals["TX"].revenue > thresholds["TX"]["sales_threshold"]  # exceeds
     assert totals["WA"].transactions > thresholds["WA"]["transaction_threshold"]  # exceeds by count
     assert totals["CA"].revenue < thresholds["CA"]["sales_threshold"]  # under

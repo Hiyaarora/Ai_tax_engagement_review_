@@ -1,4 +1,4 @@
-"""The one synthetic engagement used for demos, evals and the Milestone 3 tools.
+"""The one synthetic engagement used for demos, evals and the deterministic tools.
 
 Everything here is invented. The numbers are chosen so the documents disagree with each other in
 specific, explainable ways (see the tests) - that is what gives the review agent something to find.

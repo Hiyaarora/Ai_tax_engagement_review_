@@ -136,7 +136,7 @@ def test_opening_a_pre_status_database_rebuilds_the_table_and_keeps_rows(tmp_pat
     import sqlite3
 
     db = tmp_path / "old.db"
-    with sqlite3.connect(db) as conn:  # the Milestone 3 schema: NOT NULL everywhere, no status
+    with sqlite3.connect(db) as conn:  # the original schema: NOT NULL everywhere, no status
         conn.executescript(
             """
             CREATE TABLE reviews (

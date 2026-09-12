@@ -2,7 +2,7 @@
 
 The agent supplies the query; the *backend* supplies ``engagement_id`` from the run context, so the
 model can never widen retrieval to another engagement. Returned ``chunk_id``s are the citation keys
-the citation guard (Milestone 3) checks every flag against.
+the citation guard checks every flag against.
 """
 
 from __future__ import annotations
