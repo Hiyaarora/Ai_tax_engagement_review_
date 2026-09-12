@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from app.db.engagements import EngagementStore
-from app.services.engagement_data import EngagementDataRepository
+from app.services.engagement_data import EngagementDataRepository, EngagementNotFoundError
 from app.services.engagement_service import (
     EngagementService,
     UploadRejectedError,
@@ -135,3 +135,23 @@ def test_readiness_is_backend_owned(service: EngagementService):
     detail = service.detail(eng.engagement_id)
     assert detail.can_ask is True and detail.can_review is True
     assert detail.documents[0].chunks == 2
+
+
+def test_delete_removes_files_rows_and_returns_doc_ids(service: EngagementService, tmp_path: Path):
+    eng = service.create(company_name="Acme", home_state="CO", tax_year=2025).engagement
+    service.save_upload(eng.engagement_id, "q.pdf", b"%PDF", doc_type=None)
+    directory = tmp_path / "uploads" / "engagements" / eng.engagement_id
+    assert directory.exists()
+
+    service.delete(eng.engagement_id)
+
+    assert not directory.exists()
+    assert service.store.get(eng.engagement_id) is None
+    with pytest.raises(EngagementNotFoundError):
+        service.delete(eng.engagement_id)
+
+
+def test_reference_guide_doc_type_is_inferred_from_the_name(service: EngagementService):
+    eng = service.create(company_name="Acme", home_state="CO", tax_year=2025).engagement
+    doc = service.save_upload(eng.engagement_id, "salt_reference_guide.pdf", b"%PDF", doc_type=None)
+    assert doc.doc_type == "reference"

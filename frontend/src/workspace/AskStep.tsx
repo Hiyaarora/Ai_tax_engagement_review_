@@ -20,8 +20,9 @@ function guardNotes(report: CitationGuardReport): string[] {
 
 const EXAMPLES = [
   'Does the company hold inventory in Texas, and is it registered there?',
+  'What are the sales and transactions in Texas?',
   'How many employees work outside the home state?',
-  'What does the reference guidance say about 3PL warehouses?',
+  'What does the tax reference guide say about 3PL warehouses?',
 ]
 
 /**
@@ -59,7 +60,8 @@ export function AskStep({ detail }: Props) {
         <h3>Ask the agent</h3>
         <p className="muted small">
           Answers come only from this engagement's {indexed} indexed document{indexed === 1 ? '' : 's'}{' '}
-          and the shared reference guidance. Every citation is verified against the retrieved passage.
+          (client files and the tax reference guide) and, for sales questions, figures computed
+          from the sales data. Every citation is verified against the retrieved passage.
         </p>
         <label>
           Question
@@ -126,6 +128,24 @@ export function AskStep({ detail }: Props) {
                       ) : (
                         <p className="muted small">(quote not verified against the passage)</p>
                       )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            <section aria-labelledby={`${id}-s`} className="flag__section answer__structured">
+              <h5 id={`${id}-s`}>Computed from client data</h5>
+              {r.structured_evidence.length === 0 ? (
+                <p className="muted small">None used.</p>
+              ) : (
+                <ul className="findings">
+                  {r.structured_evidence.map((e, j) => (
+                    <li key={`${e.tool}-${j}`}>
+                      {e.finding}{' '}
+                      <span className="muted small">
+                        — Source: <code>{e.source}</code> ({e.tool})
+                      </span>
                     </li>
                   ))}
                 </ul>

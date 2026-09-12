@@ -165,6 +165,17 @@ class ReviewRepository:
                 ),
             )
 
+    def delete_for_engagement(self, engagement_id: str) -> int:
+        """Remove every review (and its decisions) of an engagement. Returns reviews removed."""
+        with self._connect() as conn:
+            conn.execute(
+                "DELETE FROM flag_decisions WHERE review_id IN"
+                " (SELECT review_id FROM reviews WHERE engagement_id = ?)",
+                (engagement_id,),
+            )
+            cursor = conn.execute("DELETE FROM reviews WHERE engagement_id = ?", (engagement_id,))
+            return cursor.rowcount
+
     # --- reads ----------------------------------------------------------------------------------
 
     def get(self, review_id: str) -> ReviewResult | None:

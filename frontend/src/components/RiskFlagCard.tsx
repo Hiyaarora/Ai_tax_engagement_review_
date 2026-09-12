@@ -53,7 +53,7 @@ export function RiskFlagCard({ flag, decision, onDecide }: Props) {
           {flag.state ? `${flag.state} · ` : ''}
           {flag.title}
         </h3>
-        <span className="flag__category">{CATEGORY_LABELS[flag.category]}</span>
+        <span className="flag__category">Potential nexus risk · {CATEGORY_LABELS[flag.category]}</span>
       </header>
 
       {!hasEvidence && (

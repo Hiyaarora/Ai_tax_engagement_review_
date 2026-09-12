@@ -125,6 +125,15 @@ class EngagementStore:
             rows = conn.execute("SELECT * FROM engagements ORDER BY created_at DESC").fetchall()
         return [EngagementRecord(**dict(row)) for row in rows]
 
+    def delete(self, engagement_id: str) -> bool:
+        """Remove the engagement and its document rows. Returns False if it did not exist."""
+        with self._connect() as conn:
+            conn.execute("DELETE FROM documents WHERE engagement_id = ?", (engagement_id,))
+            cursor = conn.execute(
+                "DELETE FROM engagements WHERE engagement_id = ?", (engagement_id,)
+            )
+            return cursor.rowcount > 0
+
     # --- documents ----------------------------------------------------------------------------
 
     def upsert_document(self, doc: DocumentRecord) -> None:

@@ -43,6 +43,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     }
     throw new ApiError(response.status, `API ${response.status}: ${detail}`)
   }
+  if (response.status === 204) return undefined as T
   return (await response.json()) as T
 }
 
@@ -56,6 +57,8 @@ export const api = {
   createEngagement: (body: { company_name: string; home_state: string; tax_year: number }) =>
     request<EngagementDetail>('/engagements', { method: 'POST', body: JSON.stringify(body) }),
   getEngagement: (id: string) => request<EngagementDetail>(`/engagements/${enc(id)}`),
+  deleteEngagement: (id: string) =>
+    request<void>(`/engagements/${enc(id)}`, { method: 'DELETE' }),
   uploadDocument: (id: string, file: File, docType?: DocType) => {
     const form = new FormData()
     form.append('file', file, file.name)

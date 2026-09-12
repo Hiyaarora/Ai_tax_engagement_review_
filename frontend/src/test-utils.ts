@@ -15,6 +15,7 @@ export function mockApi(routes: Record<string, Handler>) {
       return new Response(JSON.stringify({ detail: `no mock for ${key}` }), { status: 500 })
     }
     const { status = 200, body } = await handler(init)
+    if (status === 204) return new Response(null, { status })
     return new Response(JSON.stringify(body), { status })
   })
   return calls

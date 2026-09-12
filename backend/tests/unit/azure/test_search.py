@@ -221,3 +221,14 @@ def test_recreate_index_deletes_then_creates():
 
     assert client.deleted_indexes == ["fd-evidence"]  # type: ignore[attr-defined]
     assert client.created[0].name == "fd-evidence"
+
+
+def test_delete_engagement_chunks_removes_everything_under_the_engagement():
+    client = _FakeIndexClientV2(["fd-evidence"])
+    client.search_client.existing = [{"chunk_id": "a-p1-c0"}, {"chunk_id": "b-p1-c0"}]
+
+    deleted = _service(client).delete_engagement_chunks("acme-2025")
+
+    assert deleted == 2
+    assert client.search_client.search_calls[0]["filter"] == "engagement_id eq 'acme-2025'"
+    assert client.search_client.deleted == [{"chunk_id": "a-p1-c0"}, {"chunk_id": "b-p1-c0"}]

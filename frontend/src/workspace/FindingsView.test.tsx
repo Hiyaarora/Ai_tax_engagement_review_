@@ -18,6 +18,7 @@ describe('FindingsView', () => {
     expect(screen.getByText(/Accepted/)).toBeInTheDocument()
     expect(screen.getByText(/CA, NY/)).toBeInTheDocument()
     expect(screen.getByText(/1 of 2 flags decided/)).toBeInTheDocument()
+    expect(screen.getByText(/not a definitive tax determination/i)).toBeInTheDocument()
   })
 
   it('records a decision and updates the counter', async () => {

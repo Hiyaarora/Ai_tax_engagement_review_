@@ -90,6 +90,12 @@ export function FindingsView({ reviewId, pollMs = 3000 }: Props) {
         — every flag needs a reviewer decision before this review is complete.
       </p>
 
+      <p className="explainer">
+        <strong>Potential nexus risk</strong> means the company’s activities may create a tax
+        obligation or filing requirement in a state. Each flag is a risk indicator that requires
+        professional review — not a definitive tax determination.
+      </p>
+
       <aside className="guard">
         <h4>Citation guard</h4>
         {notes.length === 0 ? (

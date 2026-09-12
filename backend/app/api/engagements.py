@@ -96,6 +96,23 @@ def get_engagement(
     return _detail(engagements, reviews, engagement_id)
 
 
+@router.delete("/engagements/{engagement_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_engagement(
+    engagement_id: EngagementId,
+    engagements: Engagements,
+    processing: Processing,
+    reviews: Reviews,
+) -> None:
+    """Remove an engagement: uploaded files, reviews and decisions, and its search-index chunks."""
+    try:
+        engagements.get(engagement_id)
+    except EngagementNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"unknown engagement {exc}") from exc
+    processing.delete_engagement_chunks(engagement_id)
+    reviews.delete_for_engagement(engagement_id)
+    engagements.delete(engagement_id)
+
+
 @router.post(
     "/engagements/{engagement_id}/documents",
     response_model=DocumentRecord,

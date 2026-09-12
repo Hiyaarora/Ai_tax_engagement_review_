@@ -85,6 +85,10 @@ class IngestionService:
             chunks_indexed=indexed,
         )
 
+    def delete_engagement(self, engagement_id: str) -> int:
+        """Remove everything indexed under an engagement. Returns the number of chunks removed."""
+        return self._search.delete_engagement_chunks(engagement_id)
+
     def _embed_all(self, chunks: list[EvidenceChunk]) -> list[list[float]]:
         vectors: list[list[float]] = []
         for start in range(0, len(chunks), self.embed_batch_size):

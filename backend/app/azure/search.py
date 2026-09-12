@@ -144,6 +144,18 @@ class SearchService:
             client.delete_documents(keys)
         return len(keys)
 
+    def delete_engagement_chunks(self, engagement_id: str) -> int:
+        """Remove every chunk indexed under an engagement (used when the engagement is deleted)."""
+        _validate_id(engagement_id, "engagement_id")
+        client = self.search_client()
+        existing: Any = client.search(
+            search_text="*", filter=f"engagement_id eq '{engagement_id}'", select=["chunk_id"]
+        )
+        keys = [{"chunk_id": r["chunk_id"]} for r in existing]
+        if keys:
+            client.delete_documents(keys)
+        return len(keys)
+
     def hybrid_search(
         self,
         query: str,

@@ -122,6 +122,9 @@ class ReviewService:
     def list_reviews(self, engagement_id: str) -> list[ReviewSummary]:
         return self._reviews.list_for_engagement(engagement_id)
 
+    def delete_for_engagement(self, engagement_id: str) -> int:
+        return self._reviews.delete_for_engagement(engagement_id)
+
     def list_decisions(self, review_id: str) -> list[FlagDecision]:
         return self._reviews.list_decisions(review_id)
 

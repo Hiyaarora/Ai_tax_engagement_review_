@@ -68,6 +68,10 @@ class ProcessingService:
                 chunks=result.chunks_indexed,
             )
 
+    def delete_engagement_chunks(self, engagement_id: str) -> int:
+        """Remove the engagement's chunks from AI Search (called when it is deleted)."""
+        return self._ingestion.delete_engagement(engagement_id)
+
     # --- shared reference guidance --------------------------------------------------------------
 
     def reference_status(self) -> ReferenceStatus:

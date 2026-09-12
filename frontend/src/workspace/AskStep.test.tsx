@@ -17,6 +17,10 @@ const answer: AskResult = {
   citations: [
     { chunk_id: 'questionnaire-p1-c1', source_name: 'questionnaire.pdf', page: 1, quote: '3PL warehouse in Dallas' },
   ],
+  structured_evidence: [
+    { tool: 'analyze_sales_by_state', source: 'sales.csv', finding: 'TX revenue 620,000.00' },
+  ],
+  tool_calls: ['analyze_sales_by_state'],
   passages: [
     {
       chunk_id: 'questionnaire-p1-c1',
@@ -73,6 +77,10 @@ describe('AskStep', () => {
     const citations = screen.getByRole('region', { name: /Verified citations/ })
     expect(within(citations).getByText('questionnaire.pdf p.1')).toBeInTheDocument()
     expect(within(citations).getByText(/3PL warehouse in Dallas/)).toBeInTheDocument()
+    const structured = screen.getByRole('region', { name: /Computed from client data/ })
+    expect(within(structured).getByText(/TX revenue 620,000.00/)).toBeInTheDocument()
+    expect(within(structured).getByText('sales.csv')).toBeInTheDocument()
+    expect(within(citations).queryByText(/sales\.csv/)).not.toBeInTheDocument()
     const passages = screen.getByRole('region', { name: /Retrieved passages/ })
     expect(within(passages).getAllByRole('listitem')).toHaveLength(2)
     expect(screen.getByText(/1 citation removed/)).toBeInTheDocument()
@@ -82,7 +90,13 @@ describe('AskStep', () => {
   it('flags answers the documents could not support', async () => {
     mockApi({
       [`POST /api/engagements/${E}/ask`]: () => ({
-        body: { ...answer, found_in_documents: false, citations: [], answer: 'The documents do not say.' },
+        body: {
+          ...answer,
+          found_in_documents: false,
+          citations: [],
+          structured_evidence: [],
+          answer: 'The documents do not say.',
+        },
       }),
     })
     render(<AskStep detail={ready} />)

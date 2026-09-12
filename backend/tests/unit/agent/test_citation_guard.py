@@ -259,3 +259,21 @@ def test_guard_citations_is_reusable_outside_a_review_draft(acme_data):
         ("q-p1-c0", "questionnaire.pdf", 1)
     ]
     assert report.dropped_citations == ["ghost-p1-c0"] and report.corrected_citations == ["q-p1-c0"]
+
+
+def test_guard_tool_findings_is_reusable_outside_a_review_draft(acme_data):
+    from app.agent.citation_guard import guard_tool_findings
+    from app.models.review import CitationGuardReport
+
+    ctx = _ctx(acme_data, [], ["analyze_sales_by_state"])
+    report = CitationGuardReport()
+    kept = guard_tool_findings(
+        [
+            ToolFinding(tool="analyze_sales_by_state", finding="TX revenue 620,000.00"),
+            ToolFinding(tool="get_employee_locations", finding="never called"),
+        ],
+        ctx,
+        report,
+    )
+    assert [f.tool for f in kept] == ["analyze_sales_by_state"]
+    assert report.dropped_tool_findings == ["get_employee_locations"]

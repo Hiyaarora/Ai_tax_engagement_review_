@@ -36,7 +36,12 @@ from app.services.ingestion import INDEXABLE_SUFFIXES
 
 DEMO_ENGAGEMENT_ID = "acme-2025"
 _UNSAFE = re.compile(r"[^A-Za-z0-9._-]+")
-_DOC_TYPE_HINTS: dict[str, DocType] = {"questionnaire": "questionnaire", "location": "locations"}
+_DOC_TYPE_HINTS: dict[str, DocType] = {
+    "questionnaire": "questionnaire",
+    "location": "locations",
+    "reference": "reference",
+    "guide": "reference",
+}
 _STRUCTURED: dict[str, tuple[FileKind, str]] = {
     ".csv": ("sales_csv", SALES_FILE),
     QUESTIONNAIRE_FILE: ("questionnaire_json", QUESTIONNAIRE_FILE),
@@ -226,8 +231,16 @@ class EngagementService:
             return []
         return sorted(p for p in shared.iterdir() if p.suffix.lower() in INDEXABLE_SUFFIXES)
 
-    def remove_engagement_files(self, engagement_id: str) -> None:  # pragma: no cover - utility
-        shutil.rmtree(self._files.directory(engagement_id), ignore_errors=True)
+    # --- deletion -----------------------------------------------------------------------------
+
+    def delete(self, engagement_id: str) -> None:
+        """Remove the engagement's files and rows. Raises EngagementNotFoundError if unknown."""
+        self.get(engagement_id)
+        try:
+            shutil.rmtree(self._files.directory(engagement_id), ignore_errors=True)
+        except EngagementNotFoundError:
+            pass  # directory already gone; still remove the rows
+        self.store.delete(engagement_id)
 
 
 def _explain(kind: FileKind, exc: Exception) -> str:

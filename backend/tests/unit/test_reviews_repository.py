@@ -190,3 +190,16 @@ def test_intermediate_schema_with_status_but_not_null_result_columns_is_rebuilt(
     repo = ReviewRepository(db)
     repo.create_pending("rev_new", "acme-2025")
     assert repo.get_record("rev_new").status == "queued"  # type: ignore[union-attr]
+
+
+def test_delete_for_engagement_removes_reviews_and_their_decisions(tmp_path: Path):
+    from app.db.reviews import FlagDecision
+
+    repo = ReviewRepository(tmp_path / "r.db")
+    repo.save(_result("rev_1"))
+    repo.save_decision(FlagDecision(review_id="rev_1", flag_id="TX-1", decision="accepted"))
+    repo.save(_result("rev_other", engagement_id="beta-2025"))
+
+    assert repo.delete_for_engagement("acme-2025") == 1
+    assert repo.get_record("rev_1") is None and repo.list_decisions("rev_1") == []
+    assert repo.get_record("rev_other") is not None

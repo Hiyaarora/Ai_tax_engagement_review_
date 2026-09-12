@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { api } from '../api/client'
 import { StatusBadge } from '../components/StatusBadge'
-import { usePolling } from '../hooks/usePolling'
-import type { EngagementDetail, ReferenceStatus } from '../types'
+import type { EngagementDetail } from '../types'
 
 const US_STATES = [
   'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA', 'KS',
@@ -17,20 +16,18 @@ interface Props {
 
 export function HomePage({ onOpen }: Props) {
   const [engagements, setEngagements] = useState<EngagementDetail[] | null>(null)
-  const [reference, setReference] = useState<ReferenceStatus | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [company, setCompany] = useState('')
   const [homeState, setHomeState] = useState('CO')
   const [taxYear, setTaxYear] = useState(String(new Date().getFullYear() - 1))
   const [creating, setCreating] = useState(false)
+  const [deleting, setDeleting] = useState<string | null>(null)
 
   const load = useCallback(() => {
     api.listEngagements().then(setEngagements).catch((e: Error) => setError(e.message))
-    api.referenceStatus().then(setReference).catch(() => setReference(null))
   }, [])
 
   useEffect(load, [load])
-  usePolling(load, reference?.status === 'processing', 2000)
 
   async function create(event: FormEvent) {
     event.preventDefault()
@@ -50,12 +47,21 @@ export function HomePage({ onOpen }: Props) {
     }
   }
 
-  async function indexReference() {
+  async function remove(detail: EngagementDetail) {
+    const { engagement_id, company_name, tax_year } = detail.engagement
+    const ok = window.confirm(
+      `Delete "${company_name} — ${tax_year}"?\n\nThis removes its uploaded files, indexed passages, reviews and decisions. This cannot be undone.`,
+    )
+    if (!ok) return
+    setDeleting(engagement_id)
+    setError(null)
     try {
-      await api.indexReference()
-      setReference((r) => (r ? { ...r, status: 'processing', indexed: false } : r))
+      await api.deleteEngagement(engagement_id)
+      setEngagements((list) => list?.filter((e) => e.engagement.engagement_id !== engagement_id) ?? list)
     } catch (e) {
       setError((e as Error).message)
+    } finally {
+      setDeleting(null)
     }
   }
 
@@ -66,15 +72,30 @@ export function HomePage({ onOpen }: Props) {
         <form onSubmit={create} className="form">
           <label>
             Company
-            <input value={company} onChange={(e) => setCompany(e.target.value)} required />
+            <input
+              value={company}
+              onChange={(e) => setCompany(e.target.value)}
+              required
+              aria-describedby="help-company"
+            />
+            <span id="help-company" className="help">
+              Client or engagement name.
+            </span>
           </label>
           <label>
             Home state
-            <select value={homeState} onChange={(e) => setHomeState(e.target.value)}>
+            <select
+              value={homeState}
+              onChange={(e) => setHomeState(e.target.value)}
+              aria-describedby="help-state"
+            >
               {US_STATES.map((s) => (
                 <option key={s}>{s}</option>
               ))}
             </select>
+            <span id="help-state" className="help">
+              Client’s primary/home state. Used as context for the tax review.
+            </span>
           </label>
           <label>
             Tax year
@@ -85,7 +106,11 @@ export function HomePage({ onOpen }: Props) {
               value={taxYear}
               onChange={(e) => setTaxYear(e.target.value)}
               required
+              aria-describedby="help-year"
             />
+            <span id="help-year" className="help">
+              Tax period being reviewed.
+            </span>
           </label>
           <button className="primary" type="submit" disabled={creating || !company.trim()}>
             Create engagement
@@ -108,6 +133,7 @@ export function HomePage({ onOpen }: Props) {
                 <th>Year</th>
                 <th>Documents</th>
                 <th>Latest review</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -137,34 +163,21 @@ export function HomePage({ onOpen }: Props) {
                         <span className="muted">—</span>
                       )}
                     </td>
+                    <td className="table__actions">
+                      <button
+                        className="danger"
+                        onClick={() => remove(d)}
+                        disabled={deleting === d.engagement.engagement_id}
+                        aria-label={`Delete ${d.engagement.company_name} ${d.engagement.tax_year}`}
+                      >
+                        Delete
+                      </button>
+                    </td>
                   </tr>
                 )
               })}
             </tbody>
           </table>
-        )}
-      </section>
-
-      <section className="card card--quiet">
-        <h3>Shared reference guidance</h3>
-        {reference === null ? (
-          <p className="muted">Status unavailable.</p>
-        ) : reference.status === 'processing' ? (
-          <p>Indexing reference guidance…</p>
-        ) : reference.indexed ? (
-          <p>
-            Reference guidance indexed ({reference.chunks} passages). The synthetic SALT guide is
-            searchable in every engagement.
-          </p>
-        ) : (
-          <p>
-            {reference.status === 'failed' ? (
-              <span role="alert">Indexing failed: {reference.error} </span>
-            ) : (
-              <>The synthetic SALT reference guide is not indexed yet. </>
-            )}
-            <button onClick={indexReference}>Index reference guidance</button>
-          </p>
         )}
       </section>
     </div>

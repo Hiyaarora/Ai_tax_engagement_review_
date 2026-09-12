@@ -91,3 +91,15 @@ def test_meta_key_value(store: EngagementStore):
     store.set_meta("reference_status", "indexed")
     store.set_meta("reference_status", "failed")
     assert store.get_meta("reference_status") == "failed"
+
+
+def test_delete_removes_engagement_and_its_documents(store: EngagementStore):
+    store.create(_engagement())
+    store.upsert_document(
+        DocumentRecord(
+            engagement_id="acme-2025-ab12", file_name="a.pdf", kind="document", doc_type="other"
+        )
+    )
+    assert store.delete("acme-2025-ab12") is True
+    assert store.get("acme-2025-ab12") is None and store.list_documents("acme-2025-ab12") == []
+    assert store.delete("acme-2025-ab12") is False

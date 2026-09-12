@@ -65,9 +65,16 @@ def guard_citations(
     return [c for c in (_guard_citation(c, ctx, report) for c in citations) if c]
 
 
+def guard_tool_findings(
+    findings: list[ToolFinding], ctx: ReviewContext, report: CitationGuardReport
+) -> list[ToolFinding]:
+    """Keep only findings attributed to tools that actually ran in this context."""
+    return [f for f in (_guard_finding(f, ctx, report) for f in findings) if f]
+
+
 def _guard_flag(flag: RiskFlag, ctx: ReviewContext, report: CitationGuardReport) -> RiskFlag:
     citations = guard_citations(flag.retrieved_evidence, ctx, report)
-    findings = [f for f in (_guard_finding(f, ctx, report) for f in flag.tool_findings) if f]
+    findings = guard_tool_findings(flag.tool_findings, ctx, report)
     if not citations and not findings:
         report.flags_without_evidence.append(flag.id)
     return flag.model_copy(update={"retrieved_evidence": citations, "tool_findings": findings})

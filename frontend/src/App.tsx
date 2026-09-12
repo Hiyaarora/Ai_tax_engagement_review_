@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { HealthStatus } from './components/HealthStatus'
 import { HomePage } from './pages/HomePage'
 import { WorkspacePage } from './pages/WorkspacePage'
 import { parseRoute, type Route } from './routes'
@@ -21,9 +20,9 @@ export default function App() {
     <main>
       <header className="masthead">
         <h1>F&amp;D Tax Engagement Review Agent</h1>
-        <p className="disclaimer">
-          Decision support only — not tax advice. All data in this application is synthetic.
-          Every finding requires review by a qualified professional.
+        <p className="notice" role="note">
+          AI decision support • Synthetic/demo data • Human review required.{' '}
+          <span className="notice__legal">Not tax advice.</span>
         </p>
       </header>
 
@@ -41,9 +40,7 @@ export default function App() {
         <HomePage onOpen={(id) => go(`#/e/${id}/documents`)} />
       )}
 
-      <footer>
-        <HealthStatus />
-      </footer>
+      <footer className="footer">Powered by Microsoft Foundry</footer>
     </main>
   )
 }

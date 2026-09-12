@@ -157,6 +157,13 @@ export interface EvidenceHit {
   score: number
 }
 
+/** A figure computed from a client data file (e.g. sales.csv) - not a document passage. */
+export interface StructuredEvidence {
+  tool: string
+  source: string
+  finding: string
+}
+
 /** Grounded answer to one question; citations passed the same guard as review flags. */
 export interface AskResult {
   engagement_id: string
@@ -164,6 +171,8 @@ export interface AskResult {
   answer: string
   found_in_documents: boolean
   citations: Citation[]
+  structured_evidence: StructuredEvidence[]
+  tool_calls: string[]
   passages: EvidenceHit[]
   citation_guard: CitationGuardReport
   model: string

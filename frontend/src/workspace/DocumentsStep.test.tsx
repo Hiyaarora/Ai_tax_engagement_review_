@@ -10,7 +10,7 @@ const E = engagement.engagement.engagement_id
 afterEach(() => vi.restoreAllMocks())
 
 describe('DocumentsStep', () => {
-  it('shows document statuses, pages, chunks and errors', () => {
+  it('shows client files with readable types, statuses and errors; hides internal JSON', () => {
     const detail = {
       ...engagement,
       documents: [
@@ -18,17 +18,47 @@ describe('DocumentsStep', () => {
         doc({ file_name: 'locations.docx', doc_type: 'locations', status: 'processing' }),
         doc({ file_name: 'sales.csv', kind: 'sales_csv', doc_type: 'other', status: 'validated' }),
         doc({ file_name: 'bad.pdf', doc_type: 'other', status: 'failed', error: 'HttpResponseError: 400' }),
+        doc({ file_name: 'questionnaire.json', kind: 'questionnaire_json', doc_type: 'other', status: 'validated' }),
+        doc({ file_name: 'locations.json', kind: 'locations_json', doc_type: 'other', status: 'validated' }),
       ],
     }
     render(<DocumentsStep detail={detail} onChanged={vi.fn()} />)
 
-    const rows = screen.getAllByRole('row').slice(1)
+    const client = screen.getByRole('region', { name: /Client files/ })
+    const rows = within(client).getAllByRole('row').slice(1)
+    expect(rows).toHaveLength(4)
     expect(within(rows[0]).getByText('questionnaire.pdf')).toBeInTheDocument()
+    expect(within(rows[0]).getByText('Questionnaire')).toBeInTheDocument()
     expect(within(rows[0]).getByText('Indexed')).toBeInTheDocument()
     expect(within(rows[0]).getByText(/2 pages · 3 chunks/)).toBeInTheDocument()
+    expect(within(rows[1]).getByText('Employee/Office Locations')).toBeInTheDocument()
     expect(within(rows[1]).getByText('Processing…')).toBeInTheDocument()
+    expect(within(rows[2]).getByText('Sales Data')).toBeInTheDocument()
     expect(within(rows[2]).getByText('Validated')).toBeInTheDocument()
     expect(within(rows[3]).getByText(/HttpResponseError: 400/)).toBeInTheDocument()
+    expect(screen.queryByText(/questionnaire\.json|locations\.json/)).not.toBeInTheDocument()
+  })
+
+  it('lists the tax reference guide in its own section', () => {
+    const detail = {
+      ...engagement,
+      documents: [
+        doc({ file_name: 'questionnaire.pdf', status: 'indexed', pages: 2, chunks: 3 }),
+        doc({ file_name: 'salt_reference_guide.pdf', doc_type: 'reference', status: 'indexed', pages: 1, chunks: 3 }),
+      ],
+    }
+    render(<DocumentsStep detail={detail} onChanged={vi.fn()} />)
+
+    const guide = screen.getByRole('region', { name: /Tax Reference Guide/ })
+    expect(within(guide).getByText('salt_reference_guide.pdf')).toBeInTheDocument()
+    const client = screen.getByRole('region', { name: /Client files/ })
+    expect(within(client).queryByText('salt_reference_guide.pdf')).not.toBeInTheDocument()
+    expect(screen.queryByText(/shared reference/i)).not.toBeInTheDocument()
+  })
+
+  it('does not offer a synthetic demo loader', () => {
+    render(<DocumentsStep detail={engagement} onChanged={vi.fn()} />)
+    expect(screen.queryByRole('button', { name: /demo/i })).not.toBeInTheDocument()
   })
 
   it('uploads a file with the chosen document type and notifies the parent', async () => {
@@ -43,7 +73,7 @@ describe('DocumentsStep', () => {
     })
     render(<DocumentsStep detail={engagement} onChanged={onChanged} />)
 
-    await userEvent.selectOptions(screen.getByLabelText(/Document type/), 'questionnaire')
+    await userEvent.selectOptions(screen.getByLabelText(/File type/), 'questionnaire')
     await userEvent.upload(
       screen.getByLabelText(/Choose file/),
       new File(['%PDF'], 'q.pdf', { type: 'application/pdf' }),
@@ -71,24 +101,18 @@ describe('DocumentsStep', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/upload PDF, DOCX or CSV/)
   })
 
-  it('process and demo buttons call the backend and notify the parent', async () => {
+  it('process button calls the backend and notifies the parent', async () => {
     const onChanged = vi.fn()
     const calls = mockApi({
       [`POST /api/engagements/${E}/documents/process`]: () => ({ status: 202, body: { engagement_id: E, queued: 1 } }),
-      [`POST /api/engagements/${E}/demo-files`]: () => ({
-        status: 202,
-        body: { engagement_id: E, documents: [doc({})], queued: 2 },
-      }),
     })
     const withPending = { ...engagement, documents: [doc({ status: 'uploaded' })] }
     render(<DocumentsStep detail={withPending} onChanged={onChanged} />)
 
     await userEvent.click(screen.getByRole('button', { name: /Process documents/ }))
-    await userEvent.click(screen.getByRole('button', { name: /Load synthetic demo/ }))
 
     expect(calls).toContain(`POST /api/engagements/${E}/documents/process`)
-    expect(calls).toContain(`POST /api/engagements/${E}/demo-files`)
-    expect(onChanged).toHaveBeenCalledTimes(2)
+    expect(onChanged).toHaveBeenCalledTimes(1)
   })
 
   it('disables Process when nothing is waiting', () => {

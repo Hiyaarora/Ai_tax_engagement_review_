@@ -33,10 +33,10 @@ footer {
 }
 
 .disclaimer {
-  padding: 0.75rem 1rem;
-  border-left: 4px solid #b45309;
-  background: #fffbeb;
-  color: #78350f;
+  padding: 0.35rem 0.75rem;
+  border-left: 3px solid #d6d3d1;
+  font-size: 0.8rem;
+  color: var(--muted);
 }
 
 .muted {
@@ -483,6 +483,18 @@ textarea {
   background: #eff6ff;
 }
 
+.answer__structured {
+  background: #ecfdf5;
+}
+
+.answer__structured h5 {
+  margin: 0 0 0.25rem;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
 .answer__citations h5 {
   margin: 0 0 0.25rem;
   font-size: 0.8rem;
@@ -514,4 +526,56 @@ textarea {
   border-radius: 4px;
   padding: 0.5rem;
   margin: 0.25rem 0 0.75rem;
+}
+
+/* --- compact disclaimer, helper text, footer, delete --- */
+.masthead h1 {
+  margin-bottom: 0.25rem;
+}
+
+.notice {
+  margin: 0 0 1.25rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.notice__legal {
+  font-weight: 600;
+  color: #78350f;
+}
+
+.help {
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.explainer {
+  padding: 0.6rem 0.9rem;
+  border-left: 3px solid #93c5fd;
+  background: #f8fafc;
+  font-size: 0.9rem;
+}
+
+button.danger {
+  color: var(--high);
+  border-color: #fca5a5;
+}
+
+button.danger:hover:not(:disabled) {
+  background: #fef2f2;
+}
+
+.table__actions {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.footer {
+  margin-top: 3rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-align: center;
 }

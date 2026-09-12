@@ -9,21 +9,71 @@ interface Props {
   onChanged: () => void
 }
 
-const KIND_LABELS: Record<DocumentRecord['kind'], string> = {
-  document: 'Document (indexed as evidence)',
-  sales_csv: 'Sales export (structured, for the tools)',
-  questionnaire_json: 'Questionnaire data (structured)',
-  locations_json: 'Locations data (structured)',
+/** Human-readable file types. Internal JSON fixtures are never shown to the user. */
+function typeLabel(d: DocumentRecord): string {
+  if (d.kind === 'sales_csv') return 'Sales Data'
+  switch (d.doc_type) {
+    case 'questionnaire':
+      return 'Questionnaire'
+    case 'locations':
+      return 'Employee/Office Locations'
+    case 'reference':
+      return 'Tax Reference Guide'
+    default:
+      return 'Other'
+  }
+}
+
+const isInternal = (d: DocumentRecord) =>
+  d.kind === 'questionnaire_json' || d.kind === 'locations_json'
+
+function FileTable({ documents }: { documents: DocumentRecord[] }) {
+  return (
+    <table className="table">
+      <thead>
+        <tr>
+          <th>File</th>
+          <th>Type</th>
+          <th>Status</th>
+          <th>Details</th>
+        </tr>
+      </thead>
+      <tbody>
+        {documents.map((d) => (
+          <tr key={d.file_name}>
+            <td>
+              {d.file_name}
+              {d.original_name && d.original_name !== d.file_name && (
+                <div className="muted small">from {d.original_name}</div>
+              )}
+            </td>
+            <td>{typeLabel(d)}</td>
+            <td>
+              <StatusBadge status={d.status} />
+            </td>
+            <td className="small">
+              {d.status === 'indexed' && d.pages !== null && `${d.pages} pages · ${d.chunks} chunks`}
+              {d.status === 'validated' && 'Ready for the deterministic tools'}
+              {d.status === 'failed' && <span className="error-text">{d.error}</span>}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
 }
 
 export function DocumentsStep({ detail, onChanged }: Props) {
   const [file, setFile] = useState<File | null>(null)
   const [docType, setDocType] = useState<DocType | ''>('')
-  const [busy, setBusy] = useState<'upload' | 'process' | 'demo' | null>(null)
+  const [busy, setBusy] = useState<'upload' | 'process' | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const id = detail.engagement.engagement_id
 
+  const visible = detail.documents.filter((d) => !isInternal(d))
+  const clientFiles = visible.filter((d) => d.doc_type !== 'reference')
+  const referenceFiles = visible.filter((d) => d.doc_type === 'reference')
   const pending = detail.documents.filter(
     (d) => d.kind === 'document' && (d.status === 'uploaded' || d.status === 'failed'),
   )
@@ -47,7 +97,7 @@ export function DocumentsStep({ detail, onChanged }: Props) {
     event.preventDefault()
     if (!file) return
     void run('upload', () => api.uploadDocument(id, file, docType || undefined), (doc) => {
-      setNotice(`Uploaded ${doc.original_name} as ${doc.file_name} (${doc.status}).`)
+      setNotice(`Uploaded ${doc.original_name} as ${typeLabel(doc)} (${doc.status}).`)
       setFile(null)
     })
   }
@@ -58,8 +108,8 @@ export function DocumentsStep({ detail, onChanged }: Props) {
         <form onSubmit={upload} className="card form">
           <h3>Upload a file</h3>
           <p className="muted small">
-            PDF or DOCX documents are indexed as citable evidence. A CSV is treated as the sales
-            export (columns: transaction_id, date, ship_to_state, amount_usd, channel).
+            Client files: the nexus questionnaire (PDF), employee/office locations (DOCX) and the
+            sales data export (CSV). The tax reference guide (PDF) is indexed alongside them.
           </p>
           <label>
             Choose file
@@ -70,12 +120,13 @@ export function DocumentsStep({ detail, onChanged }: Props) {
             />
           </label>
           <label>
-            Document type
+            File type
             <select value={docType} onChange={(e) => setDocType(e.target.value as DocType | '')}>
-              <option value="">Infer from file name</option>
-              <option value="questionnaire">Nexus questionnaire</option>
-              <option value="locations">Employee / office locations</option>
-              <option value="other">Other</option>
+              <option value="">Detect from file name</option>
+              <option value="questionnaire">Questionnaire (PDF)</option>
+              <option value="locations">Employee/Office Locations (DOCX)</option>
+              <option value="reference">Tax Reference Guide (PDF)</option>
+              <option value="other">Other document</option>
             </select>
           </label>
           <button className="primary" type="submit" disabled={!file || busy !== null}>
@@ -86,8 +137,8 @@ export function DocumentsStep({ detail, onChanged }: Props) {
         <div className="card">
           <h3>Process</h3>
           <p className="muted small">
-            Indexing runs Document Intelligence, chunking and embeddings in the background. Each
-            document succeeds or fails on its own; failed ones can be re-processed.
+            Indexing extracts the text of each PDF/DOCX and makes it searchable for questions and
+            the review. Each file succeeds or fails on its own; failed files can be re-processed.
           </p>
           <div className="button-row">
             <button
@@ -101,66 +152,34 @@ export function DocumentsStep({ detail, onChanged }: Props) {
             >
               Process documents{pending.length ? ` (${pending.length})` : ''}
             </button>
-            <button
-              disabled={busy !== null || processing}
-              onClick={() =>
-                void run('demo', () => api.loadDemoFiles(id), (r) =>
-                  setNotice(
-                    `Loaded ${r.documents.length} synthetic Acme files; processing ${r.queued} document${r.queued === 1 ? '' : 's'}…`,
-                  ),
-                )
-              }
-            >
-              Load synthetic demo
-            </button>
+            {processing && <span className="muted small">Processing — this page updates automatically.</span>}
           </div>
-          <p className="muted small">
-            "Load synthetic demo" pushes the Acme fixtures through the same upload and processing
-            path as a manual upload.
-          </p>
         </div>
       </div>
 
       {error && <p role="alert">{error}</p>}
       {notice && <p className="status">{notice}</p>}
 
-      <h3>Files</h3>
-      {detail.documents.length === 0 ? (
-        <p className="muted">No files yet.</p>
-      ) : (
-        <table className="table">
-          <thead>
-            <tr>
-              <th>File</th>
-              <th>Kind</th>
-              <th>Type</th>
-              <th>Status</th>
-              <th>Details</th>
-            </tr>
-          </thead>
-          <tbody>
-            {detail.documents.map((d) => (
-              <tr key={d.file_name}>
-                <td>
-                  {d.file_name}
-                  {d.original_name && d.original_name !== d.file_name && (
-                    <div className="muted small">from {d.original_name}</div>
-                  )}
-                </td>
-                <td className="small">{KIND_LABELS[d.kind]}</td>
-                <td>{d.kind === 'document' ? d.doc_type : '—'}</td>
-                <td>
-                  <StatusBadge status={d.status} />
-                </td>
-                <td className="small">
-                  {d.status === 'indexed' && d.pages !== null && `${d.pages} pages · ${d.chunks} chunks`}
-                  {d.status === 'failed' && <span className="error-text">{d.error}</span>}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+      <section aria-labelledby="client-files">
+        <h3 id="client-files">Client files</h3>
+        {clientFiles.length === 0 ? (
+          <p className="muted">No client files yet — upload the questionnaire, locations and sales data.</p>
+        ) : (
+          <FileTable documents={clientFiles} />
+        )}
+      </section>
+
+      <section aria-labelledby="reference-guide">
+        <h3 id="reference-guide">Tax Reference Guide</h3>
+        {referenceFiles.length === 0 ? (
+          <p className="muted">
+            No reference guide yet — upload the tax reference guide (PDF) so answers and findings
+            can cite it.
+          </p>
+        ) : (
+          <FileTable documents={referenceFiles} />
+        )}
+      </section>
     </section>
   )
 }

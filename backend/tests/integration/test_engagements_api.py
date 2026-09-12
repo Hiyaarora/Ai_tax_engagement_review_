@@ -60,6 +60,9 @@ class _FakeReviews:
         self.repo.save_decision(decision)
         return decision
 
+    def delete_for_engagement(self, engagement_id: str) -> int:
+        return self.repo.delete_for_engagement(engagement_id)
+
 
 @pytest.fixture
 def api(tmp_path: Path):
@@ -310,3 +313,16 @@ def test_ask_requires_readiness_then_answers(api):
         == 422
     )
     assert client.post("/api/engagements/ghost-2025/ask", json={"question": "x"}).status_code == 404
+
+
+def test_delete_engagement_removes_it_and_clears_the_index(api):
+    client, _, processing, reviews = api
+    processing.deleted: list[str] = []  # type: ignore[attr-defined]
+    processing.delete_engagement_chunks = lambda eid: processing.deleted.append(eid)  # type: ignore[attr-defined]
+    reviews.repo.create_pending("rev_x", "placeholder")
+    engagement_id = _create(client)
+
+    assert client.delete(f"/api/engagements/{engagement_id}").status_code == 204
+    assert client.get(f"/api/engagements/{engagement_id}").status_code == 404
+    assert processing.deleted == [engagement_id]  # type: ignore[attr-defined]
+    assert client.delete(f"/api/engagements/{engagement_id}").status_code == 404
