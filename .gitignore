@@ -32,3 +32,6 @@ Thumbs.db
 
 # --- evaluation run outputs (regenerated; keep the golden set) ---
 backend/evals/results/
+
+# --- internal docs are not published ---
+docs/
