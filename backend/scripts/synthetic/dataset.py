@@ -149,7 +149,7 @@ class Transaction:
 
 
 # (transaction count, total revenue) per state; the generator fits random amounts to these totals.
-_SALES_PLAN: dict[str, tuple[int, float]] = {
+SALES_PLAN: dict[str, tuple[int, float]] = {
     "CO": (1400, 1_250_000.00),
     "TX": (900, 620_000.00),
     "CA": (420, 310_000.00),
@@ -160,12 +160,12 @@ _SALES_PLAN: dict[str, tuple[int, float]] = {
 _CHANNELS = ("website", "wholesale", "marketplace")
 
 
-def sales_transactions() -> list[Transaction]:
-    """Deterministic (seeded) transaction list matching ``_SALES_PLAN`` exactly."""
+def sales_transactions(plan: dict[str, tuple[int, float]] | None = None) -> list[Transaction]:
+    """Deterministic (seeded) transactions matching ``plan`` (default ``SALES_PLAN``) exactly."""
     rng = random.Random(20250101)
     rows: list[Transaction] = []
     start = date(TAX_YEAR, 1, 1)
-    for state, (count, total) in _SALES_PLAN.items():
+    for state, (count, total) in (plan or SALES_PLAN).items():
         weights = [rng.uniform(0.5, 1.5) for _ in range(count)]
         scale = total / sum(weights)
         amounts = [round(w * scale, 2) for w in weights]

@@ -25,6 +25,9 @@ from scripts.synthetic.dataset import (
     COMPANY,
     ENGAGEMENT_ID,
     TAX_YEAR,
+    EmployeeLocation,
+    QuestionnaireItem,
+    Transaction,
     employee_locations,
     questionnaire,
     sales_transactions,
@@ -79,8 +82,8 @@ def _wrap(text: str) -> Paragraph:
     return Paragraph(text, _body)
 
 
-def write_questionnaire_pdf(path: Path) -> None:
-    items = questionnaire()
+def write_questionnaire_pdf(path: Path, items: list[QuestionnaireItem] | None = None) -> None:
+    items = items if items is not None else questionnaire()
     flow: list[Any] = [
         _wrap(
             f"<b>Client:</b> {COMPANY.name} &nbsp;&nbsp; <b>Tax year:</b> {TAX_YEAR} &nbsp;&nbsp; "
@@ -106,9 +109,9 @@ def write_questionnaire_pdf(path: Path) -> None:
     _pdf(path, f"State and Local Tax (SALT) Nexus Questionnaire - {TAX_YEAR}", flow)
 
 
-def write_sales_csv_file(path: Path) -> None:
+def write_sales_csv_file(path: Path, rows: list[Transaction] | None = None) -> None:
     buffer = io.StringIO()
-    write_sales_csv(sales_transactions(), buffer)
+    write_sales_csv(rows if rows is not None else sales_transactions(), buffer)
     header = (
         f"# SYNTHETIC DATA - NOT A REAL CLIENT. {COMPANY.name}, tax year {TAX_YEAR}, "
         "ship-to state sales. Lines starting with # are comments.\n"
@@ -132,17 +135,18 @@ def write_engagement_json(path: Path) -> None:
     )
 
 
-def write_questionnaire_json(path: Path) -> None:
-    path.write_text(json.dumps([asdict(q) for q in questionnaire()], indent=2), encoding="utf-8")
+def write_questionnaire_json(path: Path, items: list[QuestionnaireItem] | None = None) -> None:
+    items = items if items is not None else questionnaire()
+    path.write_text(json.dumps([asdict(q) for q in items], indent=2), encoding="utf-8")
 
 
-def write_locations_json(path: Path) -> None:
-    path.write_text(
-        json.dumps([asdict(loc) for loc in employee_locations()], indent=2), encoding="utf-8"
-    )
+def write_locations_json(path: Path, locations: list[EmployeeLocation] | None = None) -> None:
+    locations = locations if locations is not None else employee_locations()
+    path.write_text(json.dumps([asdict(loc) for loc in locations], indent=2), encoding="utf-8")
 
 
-def write_locations_docx(path: Path) -> None:
+def write_locations_docx(path: Path, locations: list[EmployeeLocation] | None = None) -> None:
+    locations = locations if locations is not None else employee_locations()
     doc = Document()
     doc.add_paragraph(COMPANY.disclaimer)
     doc.add_heading(f"{COMPANY.name} - Employee and Office Locations ({TAX_YEAR})", level=1)
@@ -155,11 +159,11 @@ def write_locations_docx(path: Path) -> None:
     headers = ["City", "State", "Site type", "Headcount", "Note"]
     for cell, text in zip(table.rows[0].cells, headers, strict=True):
         cell.text = text
-    for loc in employee_locations():
+    for loc in locations:
         cells = table.add_row().cells
         cells[0].text, cells[1].text, cells[2].text = loc.city, loc.state, loc.site_type
         cells[3].text, cells[4].text = str(loc.headcount), loc.note
-    total = sum(loc.headcount for loc in employee_locations())
+    total = sum(loc.headcount for loc in locations)
     doc.add_paragraph(f"Total W-2 headcount: {total}.")
     doc.save(str(path))
 

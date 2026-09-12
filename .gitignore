@@ -29,3 +29,6 @@ data/*
 Thumbs.db
 .vscode/
 .idea/
+
+# --- evaluation run outputs (regenerated; keep the golden set) ---
+backend/evals/results/
