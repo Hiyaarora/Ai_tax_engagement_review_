@@ -82,7 +82,11 @@ class SearchService:
     @classmethod
     def from_settings(cls, settings: Settings) -> Self:
         return cls(
-            index_client=SearchIndexClient(settings.azure_search_endpoint, get_credential()),
+            index_client=SearchIndexClient(
+                settings.azure_search_endpoint,
+                get_credential(),
+                read_timeout=settings.azure_timeout_seconds,
+            ),
             index_name=settings.azure_search_index_name,
             endpoint=settings.azure_search_endpoint,
         )

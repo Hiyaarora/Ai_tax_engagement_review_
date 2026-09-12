@@ -3,7 +3,8 @@
 Turns a PDF/DOCX into a page-aware ``ParsedDocument`` so later stages can chunk with page numbers
 for citations. Tables are rendered as Markdown so they stay retrievable as text.
 
-Note: the F0 (free) tier only analyzes the first 2 pages of each document.
+Note: on the F0 (free) tier only the first 2 pages of each document are analyzed; S0 has no
+such limit.
 """
 
 from __future__ import annotations
@@ -155,9 +156,12 @@ class DocumentIntelligenceService:
     def from_settings(cls, settings: Settings) -> Self:
         endpoint = settings.azure_document_intelligence_endpoint
         credential = get_credential()
+        timeout = settings.azure_timeout_seconds
         return cls(
-            client=DocumentIntelligenceClient(endpoint, credential),
-            admin_client=DocumentIntelligenceAdministrationClient(endpoint, credential),
+            client=DocumentIntelligenceClient(endpoint, credential, read_timeout=timeout),
+            admin_client=DocumentIntelligenceAdministrationClient(
+                endpoint, credential, read_timeout=timeout
+            ),
             endpoint=endpoint,
         )
 

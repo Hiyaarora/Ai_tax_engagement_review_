@@ -36,6 +36,8 @@ class EmbeddingService:
         client = OpenAI(
             base_url=f"{settings.foundry_resource_endpoint}/openai/v1/",
             api_key=get_bearer_token_provider(get_credential(), COGNITIVE_SERVICES_SCOPE),
+            timeout=settings.openai_timeout_seconds,
+            max_retries=settings.openai_max_retries,
         )
         return cls(client=client, deployment=settings.foundry_embedding_deployment)
 

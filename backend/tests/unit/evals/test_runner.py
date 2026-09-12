@@ -125,3 +125,19 @@ def test_judge_flags_uses_injected_evaluators_and_averages():
         isinstance(j, FlagJudgement) and j.groundedness == 4.0 and j.relevance == 5.0
         for j in judgements
     )
+
+
+def test_judge_rows_prefer_verified_passages_over_model_quotes():
+    result = _result("acme-baseline", [_flag("TX", "TX", "physical_presence", "high")])
+    passages = {"q-p1-c1": "| inventory_tx | Does the company hold inventory in Texas? | Yes |"}
+    [row] = judge_rows("acme-baseline", result, passages=passages)
+    assert "| inventory_tx |" in row["context"]  # full passage text
+    assert "TX revenue 620,000.00" in row["context"]
+
+
+def test_passages_sidecar_round_trips(tmp_path: Path):
+    from evals.runner import load_case_passages, save_case_passages
+
+    save_case_passages(tmp_path, "acme-baseline", {"q-p1-c1": "full text"})
+    assert load_case_passages(tmp_path, "acme-baseline") == {"q-p1-c1": "full text"}
+    assert load_case_passages(tmp_path, "missing") == {}

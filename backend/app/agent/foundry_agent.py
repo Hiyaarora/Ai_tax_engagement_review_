@@ -46,7 +46,10 @@ class FoundryAgentRunner:
     @classmethod
     def from_settings(cls, settings: Settings) -> FoundryAgentRunner:
         project = AIProjectClient(settings.foundry_project_endpoint, get_credential())
-        return cls(project.get_openai_client(), agent_name=settings.foundry_agent_name)
+        client = project.get_openai_client(
+            timeout=settings.openai_timeout_seconds, max_retries=settings.openai_max_retries
+        )
+        return cls(client, agent_name=settings.foundry_agent_name)
 
     @property
     def _agent_ref(self) -> dict[str, Any]:

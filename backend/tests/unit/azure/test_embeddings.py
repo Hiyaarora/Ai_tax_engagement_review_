@@ -77,3 +77,14 @@ def test_from_settings_targets_resource_level_openai_v1_route():
     )
     service = EmbeddingService.from_settings(settings)
     assert str(service.base_url) == "https://example.services.ai.azure.com/openai/v1/"
+
+
+def test_from_settings_applies_timeout_and_retry_budget():
+    settings = Settings(
+        _env_file=None,
+        foundry_project_endpoint="https://example.services.ai.azure.com/api/projects/p",
+        openai_timeout_seconds=45,
+        openai_max_retries=1,
+    )
+    service = EmbeddingService.from_settings(settings)
+    assert service._client.timeout == 45 and service._client.max_retries == 1

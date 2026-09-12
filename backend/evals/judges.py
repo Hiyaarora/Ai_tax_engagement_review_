@@ -28,14 +28,23 @@ class FlagJudgement(BaseModel):
     relevance_reason: str = ""
 
 
-def judge_rows(case_id: str, result: ReviewResult) -> list[dict[str, str]]:
-    """One row per flag: the reviewer's question, the evidence the flag cites, and its analysis."""
+def judge_rows(
+    case_id: str, result: ReviewResult, passages: dict[str, str] | None = None
+) -> list[dict[str, str]]:
+    """One row per flag: the reviewer's question, the evidence the flag cites, and its analysis.
+
+    ``passages`` maps chunk_id -> the indexed passage text; when present it is used instead of
+    the model's (possibly cleared) quote, so the judge sees what the citation actually points at.
+    """
+    passages = passages or {}
     rows = []
     for flag in result.risk_flags:
         where = flag.state or "the engagement"
-        evidence = [
-            f"[{c.source_name} p.{c.page}] {c.quote}" for c in flag.retrieved_evidence if c.quote
-        ]
+        evidence = []
+        for c in flag.retrieved_evidence:
+            text = passages.get(c.chunk_id) or c.quote
+            if text:
+                evidence.append(f"[{c.source_name} p.{c.page}] {text}")
         evidence += [f"[{f.tool}] {f.finding}" for f in flag.tool_findings]
         rows.append(
             {

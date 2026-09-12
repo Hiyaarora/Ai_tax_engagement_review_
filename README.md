@@ -31,7 +31,8 @@ React (Vite) ──REST/JSON──> FastAPI ──┬──> Azure Document Inte
                                              • Tracing / Evaluations
 ```
 
-Full design: [docs/superpowers/specs/2026-09-11-fd-tax-review-agent-design.md](docs/superpowers/specs/2026-09-11-fd-tax-review-agent-design.md)
+Docs: [architecture](docs/architecture.md) · [demo script](docs/demo_script.md) ·
+[original design spec](docs/superpowers/specs/2026-09-11-fd-tax-review-agent-design.md)
 
 ## Repository layout
 
@@ -58,7 +59,7 @@ when deployed.
 |---|---|---|
 | Microsoft Foundry project | GPT-4.1-mini (`FOUNDRY_CHAT_DEPLOYMENT`) and text-embedding-3-small (`FOUNDRY_EMBEDDING_DEPLOYMENT`); hosts the agent | Inference uses the resource-level `{resource}/openai/v1` route, derived from the project endpoint (the project-scoped route returns 404) |
 | Azure AI Search (Basic) | RAG index `fd-evidence` (hybrid BM25 + vector) | RBAC auth — enable *Role-based access control* on the service |
-| Azure AI Document Intelligence (F0) | `prebuilt-layout` extraction of PDF/DOCX | F0 analyzes only the first 2 pages per document; synthetic demo files are kept to ≤2 pages |
+| Azure AI Document Intelligence (S0) | `prebuilt-layout` extraction of PDF/DOCX | F0 would analyze only the first 2 pages per document; S0 has no such limit |
 
 Your signed-in identity needs these roles (portal → resource → *Access control (IAM)*):
 
@@ -256,6 +257,16 @@ recall, forbidden-flag violations, citation validity (kept ÷ kept + dropped, fr
 guard), flags left without evidence, tokens and wall time per case. `--replay` re-scores saved
 results without Azure, so scoring changes are cheap to check.
 
+**Continuous evaluation in Foundry** (`uv run python -m scripts.setup_continuous_eval`): attaches
+Foundry's built-in agent evaluators (relevance, coherence, task adherence, intent resolution,
+tool-call accuracy) to every completed `FDprojectAgent` response, so the *Evaluation* column of the
+Tracing view and the Evaluations tab fill in automatically for reviews run from the UI. One-off
+prerequisite: the project's managed identity needs the **Foundry User** role on the project
+(`az role assignment create --assignee-object-id <project principalId> --assignee-principal-type
+ServicePrincipal --role "Foundry User" --scope <project resource id>`; propagation takes minutes).
+Tool-call-only turns are skipped; note that the built-in *task adherence* judge tends to mark a
+strict-JSON final response as non-adherent — the golden-set judges below score the content itself.
+
 **LLM judges** ([evals/judges.py](backend/evals/judges.py), optional): Groundedness and Relevance
 from the Azure AI Evaluation SDK, keyless on the same GPT-4.1-mini deployment. For every flag the
 judge sees the reviewer's question, the evidence the flag actually cites (verified quotes + tool
@@ -307,6 +318,42 @@ All configuration is read from environment variables via `pydantic-settings` (`b
 Azure SDK clients are wrapped once in `backend/app/azure/` (`credential.py`, `document_intelligence.py`,
 `embeddings.py`, `search.py`, `connectivity.py`); business logic never constructs SDK clients directly.
 
+## Known limitations
+
+- **Structured questionnaire / locations data is not extracted from the PDF/DOCX.** The
+  deterministic tools read `questionnaire.json` / `locations.json`, which today exist only as
+  synthetic fixtures (loaded by the demo path). For a user-created engagement the review still
+  runs — the tools report "not provided" and the agent works from the indexed documents and the
+  sales CSV. Extraction (Document Intelligence custom model or a structured-output pass) is the
+  natural next step and was deliberately kept out of the critical path.
+- **Single-tenant, no end-user login.** All Azure access is keyless via `DefaultAzureCredential`;
+  the web app itself has no authentication (Entra ID via MSAL would be the next step).
+- **Synchronous questions, polled reviews, no streaming.** Reviews take 30–60 s; the UI polls.
+- **Thresholds are illustrative.** `reference_data/thresholds.json` and the reference guide are
+  synthetic and labelled as such; nothing here is a statement of any state's law.
+- **One review agent, one prompt agent version at a time.** The agent definition is versioned in
+  the repo and pushed with `scripts/sync_agent.py`; there is no A/B of prompt versions.
+- **SQLite and local files.** Fine for a single instance; swapping to Postgres/Blob is a
+  repository-level change.
+- **Latency is measured, not optimised.** Document Intelligence dominates ingestion; each AI Search
+  round-trip is ~1.5 s; a review is ~3 model turns. All clients now have timeouts and retry budgets.
+
+## Interview talking points
+
+1. *Why a hosted Foundry agent plus local tools?* The agent, its versions, tracing and evaluations
+   live in Foundry; the tools run next to the data. The 2.x Responses-API loop
+   (`function_call` → `function_call_output`) is ~60 lines and fully unit-tested with fakes.
+2. *How do you stop hallucinated evidence?* The citation guard (chunk must have been retrieved in
+   this run; source/page from the index; verbatim quotes; tool findings only from tools that ran)
+   plus strict JSON output and Pydantic re-validation. The guard reports what it changed.
+3. *Why isn't the CSV in the vector index?* Numbers are computed, not read: pure Python tools,
+   attributed as `tool:<name>`, exposed to both the review agent and the ask flow.
+4. *How do you know it works?* A golden set of dataset variants with expected/forbidden flags,
+   deterministic scoring, LLM-judged groundedness on the actual cited passages, and traces for
+   every stage. The eval loop already caught and fixed one evidence gap.
+5. *What would production add?* Entra ID login, streaming, structured-data extraction, Postgres,
+   a larger golden set, and CI running the offline tests plus a nightly live eval.
+
 ## Milestones
 
 1. **Scaffold** — structure, FastAPI, React, config, health endpoint, tests ✅
@@ -317,4 +364,4 @@ Azure SDK clients are wrapped once in `backend/app/azure/` (`credential.py`, `do
 4. **Review UI** — create → upload/process (background) → ask (grounded Q&A) → run review (background) → findings with decisions ✅
 5. **Observability** — OpenTelemetry spans per stage, log/trace correlation, token + latency accounting in the UI, Application Insights → Foundry Tracing ✅
 6. **Evaluation** — golden set of dataset variants, deterministic recall/violations/citation validity, LLM-judged groundedness & relevance, Foundry Evaluations upload ✅
-7. **Polish** — docs, demo script
+7. **Polish** — architecture doc, demo script, known limitations, client timeouts ✅

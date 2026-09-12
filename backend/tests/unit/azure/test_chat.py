@@ -123,3 +123,14 @@ def test_complete_json_with_tools_stops_after_max_turns():
             max_turns=3,
         )
     assert len(client.responses.calls) == 3
+
+
+def test_from_settings_applies_timeout_and_retry_budget():
+    settings = Settings(
+        _env_file=None,
+        foundry_project_endpoint="https://example.services.ai.azure.com/api/projects/p",
+        openai_timeout_seconds=45,
+        openai_max_retries=1,
+    )
+    service = ChatService.from_settings(settings)
+    assert service._client.timeout == 45 and service._client.max_retries == 1

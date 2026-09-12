@@ -11,6 +11,7 @@ import json
 import logging
 import time
 from pathlib import Path
+from typing import Any
 
 from app.models.review import ReviewResult
 from evals.cases import EvalCase, load_cases, write_variant_files
@@ -20,6 +21,7 @@ from evals.scoring import CaseScore, Summary, render_markdown, score_review, sum
 log = logging.getLogger(__name__)
 
 RESULT_SUFFIX = ".result.json"
+PASSAGES_SUFFIX = ".passages.json"
 
 
 def save_case_result(out_dir: Path, case_id: str, result: ReviewResult) -> Path:
@@ -27,6 +29,21 @@ def save_case_result(out_dir: Path, case_id: str, result: ReviewResult) -> Path:
     path = out_dir / f"{case_id}{RESULT_SUFFIX}"
     path.write_text(result.model_dump_json(indent=2), encoding="utf-8")
     return path
+
+
+def save_case_passages(out_dir: Path, case_id: str, passages: dict[str, str]) -> Path:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    path = out_dir / f"{case_id}{PASSAGES_SUFFIX}"
+    path.write_text(json.dumps(passages, indent=2), encoding="utf-8")
+    return path
+
+
+def load_case_passages(out_dir: Path, case_id: str) -> dict[str, str]:
+    path = out_dir / f"{case_id}{PASSAGES_SUFFIX}"
+    if not path.is_file():
+        return {}
+    loaded: dict[str, str] = json.loads(path.read_text(encoding="utf-8"))
+    return loaded
 
 
 def load_case_results(out_dir: Path) -> dict[str, ReviewResult]:
@@ -90,6 +107,24 @@ def replay(out_dir: Path) -> tuple[Summary, list[CaseScore], str]:
     return summary, scores, report
 
 
+def _cited_passages(settings: Any, result: ReviewResult) -> dict[str, str]:
+    """Text of every chunk the review cites, read back from the index (before it is deleted)."""
+    from app.azure.search import SearchService
+
+    client = SearchService.from_settings(settings).search_client()
+    passages: dict[str, str] = {}
+    for flag in result.risk_flags:
+        for citation in flag.retrieved_evidence:
+            if citation.chunk_id in passages:
+                continue
+            try:
+                document = client.get_document(key=citation.chunk_id, selected_fields=["content"])
+                passages[citation.chunk_id] = str(document["content"])
+            except Exception as exc:  # noqa: BLE001 - judging is best effort
+                log.warning("could not fetch passage %s: %s", citation.chunk_id, exc)
+    return passages
+
+
 def run_case_live(case: EvalCase, out_dir: Path, *, workdir: Path) -> ReviewResult:
     """Build the case as a throwaway engagement, review it, save the result, delete it."""
     from app.api.dependencies import (
@@ -121,6 +156,7 @@ def run_case_live(case: EvalCase, out_dir: Path, *, workdir: Path) -> ReviewResu
             )
         result = reviews.run_review(engagement_id)
         save_case_result(out_dir, case.case_id, result)
+        save_case_passages(out_dir, case.case_id, _cited_passages(settings, result))
         return result
     finally:
         processing.delete_engagement_chunks(engagement_id)

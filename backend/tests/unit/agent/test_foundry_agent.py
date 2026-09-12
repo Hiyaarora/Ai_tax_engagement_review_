@@ -105,3 +105,16 @@ def test_run_raises_when_final_response_has_no_text():
     client = _FakeClient([_response("r1", [SimpleNamespace(type="message")], text="")])
     with pytest.raises(AgentRunError, match="no output text"):
         FoundryAgentRunner(client, agent_name="A").run("go", lambda n, a: "{}")  # type: ignore[arg-type]
+
+
+def test_from_settings_applies_timeout_to_the_agent_client():
+    from app.config import Settings
+
+    settings = Settings(
+        _env_file=None,
+        foundry_project_endpoint="https://example.services.ai.azure.com/api/projects/p",
+        openai_timeout_seconds=45,
+        openai_max_retries=1,
+    )
+    runner = FoundryAgentRunner.from_settings(settings)
+    assert runner._client.timeout == 45 and runner._client.max_retries == 1

@@ -37,6 +37,11 @@ class Settings(BaseSettings):
     # --- Azure AI Document Intelligence (Milestone 2) ---
     azure_document_intelligence_endpoint: str = ""
 
+    # --- Client budgets: a stalled Azure call must fail fast, not hang a review for an hour ---
+    openai_timeout_seconds: int = 120  # per model call (reviews make several)
+    openai_max_retries: int = 2
+    azure_timeout_seconds: int = 60  # Document Intelligence / AI Search per-request read timeout
+
     # --- Observability (Milestone 5) ---
     # Application Insights connection string (keep it in .env). Empty = try the Application
     # Insights resource attached to the Foundry project, else trace locally without exporting.

@@ -21,7 +21,13 @@ from pathlib import Path
 
 from evals.cases import load_cases
 from evals.judges import FlagJudgement, judge_flags, judge_rows
-from evals.runner import load_case_results, replay, run_case_live, write_report
+from evals.runner import (
+    load_case_passages,
+    load_case_results,
+    replay,
+    run_case_live,
+    write_report,
+)
 from evals.scoring import score_review
 
 RESULTS_ROOT = Path(__file__).resolve().parents[1] / "evals" / "results"
@@ -59,6 +65,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--upload", action="store_true", help="push judge run to Foundry")
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
+    for noisy in ("azure", "httpx", "openai", "urllib3"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
 
     if args.replay:
         summary, _, report = replay(args.replay)
@@ -83,7 +91,11 @@ def main(argv: list[str] | None = None) -> int:
         from evals.judges import build_evaluators
 
         groundedness, relevance = build_evaluators(get_settings())
-        rows = [row for cid, result in results.items() for row in judge_rows(cid, result)]
+        rows = [
+            row
+            for cid, result in results.items()
+            for row in judge_rows(cid, result, load_case_passages(out_dir, cid))
+        ]
         judgements = judge_flags(rows, groundedness=groundedness, relevance=relevance)
         if args.upload:
             url = _upload_to_foundry(rows, out_dir)
